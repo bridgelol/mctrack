@@ -189,7 +189,7 @@ export const campaigns = pgTable('campaigns', {
   id: uuid('id').primaryKey().defaultRandom(),
   networkId: uuid('network_id').notNull().references(() => networks.id, { onDelete: 'cascade' }),
   name: varchar('name', { length: 100 }).notNull(),
-  domainFilter: varchar('domain_filter', { length: 255 }),
+  domainFilter: varchar('domain_filter', { length: 255 }).notNull(),
   startDate: date('start_date').notNull(),
   endDate: date('end_date').notNull(),
   budgetType: budgetTypeEnum('budget_type').notNull(),
