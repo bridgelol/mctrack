@@ -1,0 +1,114 @@
+---
+# Common setup for all nodes
+
+- name: Set hostname
+  hostname:
+    name: "{{ inventory_hostname }}"
+
+- name: Update apt cache
+  apt:
+    update_cache: yes
+    cache_valid_time: 3600
+
+- name: Install common packages
+  apt:
+    name:
+      - apt-transport-https
+      - ca-certificates
+      - curl
+      - gnupg
+      - lsb-release
+      - software-properties-common
+      - python3-pip
+      - htop
+      - iotop
+      - vim
+      - net-tools
+      - jq
+      - unzip
+      - chrony
+    state: present
+
+- name: Configure NTP
+  service:
+    name: chrony
+    state: started
+    enabled: yes
+
+- name: Set timezone
+  timezone:
+    name: UTC
+
+- name: Configure sysctl for performance
+  sysctl:
+    name: "{{ item.name }}"
+    value: "{{ item.value }}"
+    state: present
+    reload: yes
+  loop:
+    - { name: 'net.core.somaxconn', value: '65535' }
+    - { name: 'net.ipv4.tcp_max_syn_backlog', value: '65535' }
+    - { name: 'net.ipv4.ip_local_port_range', value: '1024 65535' }
+    - { name: 'net.ipv4.tcp_tw_reuse', value: '1' }
+    - { name: 'net.core.netdev_max_backlog', value: '65536' }
+    - { name: 'vm.swappiness', value: '10' }
+    - { name: 'vm.dirty_ratio', value: '60' }
+    - { name: 'vm.dirty_background_ratio', value: '2' }
+
+- name: Configure file limits
+  pam_limits:
+    domain: '*'
+    limit_type: "{{ item.type }}"
+    limit_item: "{{ item.item }}"
+    value: "{{ item.value }}"
+  loop:
+    - { type: 'soft', item: 'nofile', value: '65535' }
+    - { type: 'hard', item: 'nofile', value: '65535' }
+    - { type: 'soft', item: 'nproc', value: '65535' }
+    - { type: 'hard', item: 'nproc', value: '65535' }
+
+- name: Setup data disk
+  block:
+    - name: Create partition
+      parted:
+        device: "{{ data_disk }}"
+        number: 1
+        state: present
+        fs_type: ext4
+
+    - name: Create filesystem
+      filesystem:
+        fstype: ext4
+        dev: "{{ data_disk }}1"
+
+    - name: Mount data disk
+      mount:
+        path: "{{ data_mount_point }}"
+        src: "{{ data_disk }}1"
+        fstype: ext4
+        opts: defaults,noatime
+        state: mounted
+  when: data_disk is defined
+
+- name: Create mctrack user
+  user:
+    name: mctrack
+    shell: /bin/bash
+    groups: sudo
+    append: yes
+
+- name: Configure firewall (UFW)
+  ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: tcp
+  loop:
+    - '22'    # SSH
+    - '80'    # HTTP
+    - '443'   # HTTPS
+  notify: Reload UFW
+
+- name: Enable UFW
+  ufw:
+    state: enabled
+    policy: deny

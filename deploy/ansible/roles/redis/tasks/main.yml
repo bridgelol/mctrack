@@ -1,0 +1,69 @@
+---
+# Redis cluster installation
+
+- name: Add Redis repository
+  apt_repository:
+    repo: "ppa:redislabs/redis"
+    state: present
+
+- name: Install Redis
+  apt:
+    name: redis-server
+    state: present
+  notify: Restart Redis
+
+- name: Create Redis data directory
+  file:
+    path: /data/redis
+    state: directory
+    owner: redis
+    group: redis
+    mode: '0750'
+
+- name: Configure Redis
+  template:
+    src: redis.conf.j2
+    dest: /etc/redis/redis.conf
+    owner: redis
+    group: redis
+    mode: '0640'
+  notify: Restart Redis
+
+- name: Configure Redis cluster
+  template:
+    src: redis-cluster.conf.j2
+    dest: /etc/redis/redis-cluster.conf
+    owner: redis
+    group: redis
+    mode: '0640'
+  notify: Restart Redis
+  when: redis_cluster_enabled
+
+- name: Configure firewall for Redis
+  ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: tcp
+    src: "{{ hostvars[groups['k8s'][0]]['ansible_default_ipv4']['network'] }}/24"
+  loop:
+    - "{{ redis_port }}"
+    - "16379"  # Cluster bus port
+
+- name: Start and enable Redis
+  service:
+    name: redis-server
+    state: started
+    enabled: yes
+
+- name: Create Redis cluster
+  command: >
+    redis-cli --cluster create
+    {% for host in groups['redis'] %}
+    {{ hostvars[host]['ansible_host'] }}:{{ redis_port }}
+    {% endfor %}
+    --cluster-replicas 0 --cluster-yes
+  run_once: true
+  when: redis_cluster_enabled
+  register: cluster_create
+  changed_when: "'OK' in cluster_create.stdout"
+  failed_when: false

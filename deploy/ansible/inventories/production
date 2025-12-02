@@ -1,0 +1,35 @@
+[k8s_master]
+master1.mctrack.example.com ansible_host=10.0.0.10
+master2.mctrack.example.com ansible_host=10.0.0.11
+master3.mctrack.example.com ansible_host=10.0.0.12
+
+[k8s_worker]
+worker1.mctrack.example.com ansible_host=10.0.0.20
+worker2.mctrack.example.com ansible_host=10.0.0.21
+worker3.mctrack.example.com ansible_host=10.0.0.22
+
+[clickhouse]
+ch1.mctrack.example.com ansible_host=10.0.0.30
+ch2.mctrack.example.com ansible_host=10.0.0.31
+ch3.mctrack.example.com ansible_host=10.0.0.32
+
+[postgres]
+pg1.mctrack.example.com ansible_host=10.0.0.40
+pg2.mctrack.example.com ansible_host=10.0.0.41
+
+[redis]
+redis1.mctrack.example.com ansible_host=10.0.0.50
+redis2.mctrack.example.com ansible_host=10.0.0.51
+redis3.mctrack.example.com ansible_host=10.0.0.52
+
+[k8s:children]
+k8s_master
+k8s_worker
+
+[database:children]
+clickhouse
+postgres
+
+[all:vars]
+ansible_user=mctrack
+ansible_python_interpreter=/usr/bin/python3

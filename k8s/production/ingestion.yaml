@@ -1,0 +1,134 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ingestion
+  namespace: mctrack
+  labels:
+    app: ingestion
+    tier: backend
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: ingestion
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: ingestion
+        tier: backend
+    spec:
+      containers:
+        - name: ingestion
+          image: ghcr.io/mctrack/ingestion:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 4001
+              name: http
+          env:
+            - name: NODE_ENV
+              value: production
+            - name: PORT
+              value: "4001"
+            - name: CLICKHOUSE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: mctrack-secrets
+                  key: CLICKHOUSE_URL
+            - name: REDIS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: mctrack-secrets
+                  key: REDIS_URL
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "200m"
+            limits:
+              memory: "1Gi"
+              cpu: "1000m"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 4001
+            initialDelaySeconds: 10
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 4001
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+      imagePullSecrets:
+        - name: registry-credentials
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values:
+                        - ingestion
+                topologyKey: kubernetes.io/hostname
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ingestion
+  namespace: mctrack
+spec:
+  selector:
+    app: ingestion
+  ports:
+    - port: 4001
+      targetPort: 4001
+      name: http
+  type: ClusterIP
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: ingestion
+  namespace: mctrack
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: ingestion
+  minReplicas: 3
+  maxReplicas: 20
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 60
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 70
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: ingestion
+  namespace: mctrack
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: ingestion

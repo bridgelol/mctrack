@@ -1,0 +1,21 @@
+{
+  "name": "mctrack",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm -r --parallel run dev",
+    "build": "pnpm -r run build",
+    "lint": "pnpm -r run lint",
+    "clean": "pnpm -r run clean && rm -rf node_modules",
+    "db:generate": "pnpm --filter @mctrack/db run generate",
+    "db:migrate": "pnpm --filter @mctrack/db run migrate",
+    "db:push": "pnpm --filter @mctrack/db run push"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "typescript": "^5.9.3"
+  },
+  "packageManager": "pnpm@9.0.0",
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

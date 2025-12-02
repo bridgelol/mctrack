@@ -1,0 +1,145 @@
+---
+# Kubernetes master node setup
+
+- name: Install containerd
+  include_tasks: containerd.yml
+
+- name: Add Kubernetes apt key
+  apt_key:
+    url: https://pkgs.k8s.io/core:/stable:/v{{ k8s_version }}/deb/Release.key
+    state: present
+
+- name: Add Kubernetes repository
+  apt_repository:
+    repo: "deb https://pkgs.k8s.io/core:/stable:/v{{ k8s_version }}/deb/ /"
+    state: present
+    filename: kubernetes
+
+- name: Install Kubernetes packages
+  apt:
+    name:
+      - kubelet
+      - kubeadm
+      - kubectl
+    state: present
+  register: k8s_install
+
+- name: Hold Kubernetes packages
+  dpkg_selections:
+    name: "{{ item }}"
+    selection: hold
+  loop:
+    - kubelet
+    - kubeadm
+    - kubectl
+
+- name: Disable swap
+  command: swapoff -a
+  changed_when: false
+
+- name: Remove swap from fstab
+  lineinfile:
+    path: /etc/fstab
+    regexp: '\sswap\s'
+    state: absent
+
+- name: Load required kernel modules
+  modprobe:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - overlay
+    - br_netfilter
+
+- name: Persist kernel modules
+  copy:
+    content: |
+      overlay
+      br_netfilter
+    dest: /etc/modules-load.d/containerd.conf
+
+- name: Configure sysctl for Kubernetes
+  sysctl:
+    name: "{{ item.name }}"
+    value: "{{ item.value }}"
+    state: present
+    reload: yes
+  loop:
+    - { name: 'net.bridge.bridge-nf-call-iptables', value: '1' }
+    - { name: 'net.bridge.bridge-nf-call-ip6tables', value: '1' }
+    - { name: 'net.ipv4.ip_forward', value: '1' }
+
+- name: Initialize first master node
+  block:
+    - name: Check if cluster is initialized
+      stat:
+        path: /etc/kubernetes/admin.conf
+      register: kubeadm_init
+
+    - name: Initialize cluster
+      command: >
+        kubeadm init
+        --control-plane-endpoint "{{ groups['k8s_master'][0] }}:6443"
+        --upload-certs
+        --pod-network-cidr={{ k8s_pod_network_cidr }}
+        --service-cidr={{ k8s_service_cidr }}
+      when: not kubeadm_init.stat.exists
+      register: kubeadm_init_result
+
+    - name: Create .kube directory
+      file:
+        path: /root/.kube
+        state: directory
+        mode: '0755'
+
+    - name: Copy admin.conf
+      copy:
+        src: /etc/kubernetes/admin.conf
+        dest: /root/.kube/config
+        remote_src: yes
+        mode: '0600'
+
+    - name: Install Calico network plugin
+      command: kubectl apply -f https://raw.githubusercontent.com/projectcalico/calico/v3.26.1/manifests/calico.yaml
+      when: kubeadm_init_result is changed
+
+    - name: Get join command
+      command: kubeadm token create --print-join-command
+      register: join_command
+      changed_when: false
+
+    - name: Get certificate key
+      command: kubeadm init phase upload-certs --upload-certs
+      register: cert_key
+      changed_when: false
+
+    - name: Set join facts
+      set_fact:
+        k8s_join_command: "{{ join_command.stdout }}"
+        k8s_cert_key: "{{ cert_key.stdout_lines[-1] }}"
+  when: inventory_hostname == groups['k8s_master'][0]
+
+- name: Join additional master nodes
+  block:
+    - name: Check if node is part of cluster
+      stat:
+        path: /etc/kubernetes/kubelet.conf
+      register: kubelet_conf
+
+    - name: Join cluster as control plane
+      command: "{{ hostvars[groups['k8s_master'][0]]['k8s_join_command'] }} --control-plane --certificate-key {{ hostvars[groups['k8s_master'][0]]['k8s_cert_key'] }}"
+      when: not kubelet_conf.stat.exists
+  when: inventory_hostname != groups['k8s_master'][0]
+
+- name: Configure firewall for Kubernetes master
+  ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: tcp
+  loop:
+    - '6443'   # API server
+    - '2379'   # etcd client
+    - '2380'   # etcd peer
+    - '10250'  # Kubelet
+    - '10259'  # kube-scheduler
+    - '10257'  # kube-controller-manager

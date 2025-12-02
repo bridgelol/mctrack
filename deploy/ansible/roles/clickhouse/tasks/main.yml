@@ -1,0 +1,87 @@
+---
+# ClickHouse installation and configuration
+
+- name: Add ClickHouse apt key
+  apt_key:
+    url: https://packages.clickhouse.com/rpm/lts/repodata/repomd.xml.key
+    state: present
+
+- name: Add ClickHouse repository
+  apt_repository:
+    repo: "deb https://packages.clickhouse.com/deb stable main"
+    state: present
+    filename: clickhouse
+
+- name: Install ClickHouse packages
+  apt:
+    name:
+      - clickhouse-server
+      - clickhouse-client
+      - clickhouse-common-static
+    state: present
+  notify: Restart ClickHouse
+
+- name: Create ClickHouse data directory
+  file:
+    path: "{{ clickhouse_data_dir }}"
+    state: directory
+    owner: clickhouse
+    group: clickhouse
+    mode: '0750'
+
+- name: Configure ClickHouse server
+  template:
+    src: config.xml.j2
+    dest: /etc/clickhouse-server/config.xml
+    owner: clickhouse
+    group: clickhouse
+    mode: '0640'
+  notify: Restart ClickHouse
+
+- name: Configure ClickHouse users
+  template:
+    src: users.xml.j2
+    dest: /etc/clickhouse-server/users.xml
+    owner: clickhouse
+    group: clickhouse
+    mode: '0640'
+  notify: Restart ClickHouse
+
+- name: Configure ClickHouse cluster
+  template:
+    src: cluster.xml.j2
+    dest: /etc/clickhouse-server/config.d/cluster.xml
+    owner: clickhouse
+    group: clickhouse
+    mode: '0640'
+  notify: Restart ClickHouse
+
+- name: Create MCTrack database schema
+  template:
+    src: schema.sql.j2
+    dest: /tmp/mctrack_schema.sql
+    mode: '0644'
+
+- name: Apply database schema
+  command: clickhouse-client --multiquery < /tmp/mctrack_schema.sql
+  register: schema_result
+  changed_when: schema_result.rc == 0
+  failed_when: false
+  run_once: true
+
+- name: Configure firewall for ClickHouse
+  ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: tcp
+    src: "{{ hostvars[groups['k8s'][0]]['ansible_default_ipv4']['network'] }}/24"
+  loop:
+    - "{{ clickhouse_http_port }}"
+    - "{{ clickhouse_tcp_port }}"
+    - "{{ clickhouse_interserver_port }}"
+
+- name: Start and enable ClickHouse
+  service:
+    name: clickhouse-server
+    state: started
+    enabled: yes

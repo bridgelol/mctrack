@@ -1,0 +1,31 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mctrack-config
+  namespace: mctrack
+data:
+  # API Configuration
+  API_PORT: "4000"
+  INGESTION_PORT: "4001"
+  WEB_PORT: "3000"
+
+  # External URLs
+  API_URL: "https://api.mctrack.example.com"
+  INGESTION_URL: "https://ingest.mctrack.example.com"
+  WEB_URL: "https://mctrack.example.com"
+
+  # Feature flags
+  ENABLE_SIGNUP: "true"
+  ENABLE_OAUTH: "true"
+
+  # Retention settings
+  DATA_RETENTION_DAYS: "365"
+  SESSION_RETENTION_DAYS: "90"
+
+  # Rate limiting
+  RATE_LIMIT_WINDOW_MS: "60000"
+  RATE_LIMIT_MAX_REQUESTS: "100"
+
+  # Logging
+  LOG_LEVEL: "info"
+  LOG_FORMAT: "json"

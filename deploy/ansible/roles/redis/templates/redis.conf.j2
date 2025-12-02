@@ -1,0 +1,45 @@
+# Redis configuration for MCTrack
+
+bind 0.0.0.0
+port {{ redis_port }}
+protected-mode yes
+requirepass {{ redis_password }}
+
+# Persistence
+dir /data/redis
+appendonly yes
+appendfsync everysec
+
+# Memory
+maxmemory 1gb
+maxmemory-policy allkeys-lru
+
+# Networking
+tcp-backlog 511
+timeout 0
+tcp-keepalive 300
+
+# Logging
+loglevel notice
+logfile /var/log/redis/redis-server.log
+
+# Cluster
+{% if redis_cluster_enabled %}
+cluster-enabled yes
+cluster-config-file nodes.conf
+cluster-node-timeout 5000
+{% endif %}
+
+# Performance tuning
+save 900 1
+save 300 10
+save 60 10000
+
+stop-writes-on-bgsave-error yes
+rdbcompression yes
+rdbchecksum yes
+
+# Security
+rename-command FLUSHDB ""
+rename-command FLUSHALL ""
+rename-command DEBUG ""

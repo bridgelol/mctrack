@@ -1,0 +1,158 @@
+---
+# Deploy MCTrack application to Kubernetes
+
+- name: Create mctrack namespace
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: mctrack
+
+- name: Create image pull secret
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: registry-credentials
+        namespace: mctrack
+      type: kubernetes.io/dockerconfigjson
+      data:
+        .dockerconfigjson: "{{ docker_config_json | b64encode }}"
+  when: docker_config_json is defined
+
+- name: Create MCTrack secrets
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: mctrack-secrets
+        namespace: mctrack
+      type: Opaque
+      stringData:
+        DATABASE_URL: "postgresql://mctrack:{{ postgres_mctrack_password }}@{{ hostvars[groups['postgres'][0]]['ansible_host'] }}:5432/mctrack"
+        CLICKHOUSE_URL: "http://{{ hostvars[groups['clickhouse'][0]]['ansible_host'] }}:8123"
+        REDIS_URL: "redis://:{{ redis_password }}@{{ hostvars[groups['redis'][0]]['ansible_host'] }}:6379"
+        JWT_SECRET: "{{ jwt_secret }}"
+        AUTH_SECRET: "{{ auth_secret }}"
+
+- name: Apply production Kubernetes manifests
+  kubernetes.core.k8s:
+    state: present
+    src: "{{ item }}"
+  with_fileglob:
+    - "../../../k8s/production/*.yaml"
+
+- name: Create Ingress for API
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: networking.k8s.io/v1
+      kind: Ingress
+      metadata:
+        name: mctrack-api
+        namespace: mctrack
+        annotations:
+          kubernetes.io/ingress.class: nginx
+          cert-manager.io/cluster-issuer: letsencrypt-prod
+      spec:
+        tls:
+          - hosts:
+              - "api.{{ domain }}"
+            secretName: mctrack-api-tls
+        rules:
+          - host: "api.{{ domain }}"
+            http:
+              paths:
+                - path: /
+                  pathType: Prefix
+                  backend:
+                    service:
+                      name: api
+                      port:
+                        number: 4000
+
+- name: Create Ingress for Web
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: networking.k8s.io/v1
+      kind: Ingress
+      metadata:
+        name: mctrack-web
+        namespace: mctrack
+        annotations:
+          kubernetes.io/ingress.class: nginx
+          cert-manager.io/cluster-issuer: letsencrypt-prod
+      spec:
+        tls:
+          - hosts:
+              - "{{ domain }}"
+              - "www.{{ domain }}"
+            secretName: mctrack-web-tls
+        rules:
+          - host: "{{ domain }}"
+            http:
+              paths:
+                - path: /
+                  pathType: Prefix
+                  backend:
+                    service:
+                      name: web
+                      port:
+                        number: 3000
+          - host: "www.{{ domain }}"
+            http:
+              paths:
+                - path: /
+                  pathType: Prefix
+                  backend:
+                    service:
+                      name: web
+                      port:
+                        number: 3000
+
+- name: Create Ingress for Ingestion
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: networking.k8s.io/v1
+      kind: Ingress
+      metadata:
+        name: mctrack-ingestion
+        namespace: mctrack
+        annotations:
+          kubernetes.io/ingress.class: nginx
+          cert-manager.io/cluster-issuer: letsencrypt-prod
+          nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+      spec:
+        tls:
+          - hosts:
+              - "ingest.{{ domain }}"
+            secretName: mctrack-ingestion-tls
+        rules:
+          - host: "ingest.{{ domain }}"
+            http:
+              paths:
+                - path: /
+                  pathType: Prefix
+                  backend:
+                    service:
+                      name: ingestion
+                      port:
+                        number: 4001
+
+- name: Wait for deployments to be ready
+  kubernetes.core.k8s_info:
+    api_version: apps/v1
+    kind: Deployment
+    namespace: mctrack
+  register: deployments
+  until: deployments.resources | selectattr('status.readyReplicas', 'defined') | selectattr('status.readyReplicas', '>', 0) | list | length == deployments.resources | length
+  retries: 30
+  delay: 10

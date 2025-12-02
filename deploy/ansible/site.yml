@@ -1,0 +1,37 @@
+---
+# MCTrack Full Cluster Deployment Playbook
+
+- name: Prepare all nodes
+  hosts: all
+  roles:
+    - common
+
+- name: Setup ClickHouse cluster
+  hosts: clickhouse
+  roles:
+    - clickhouse
+
+- name: Setup PostgreSQL with replication
+  hosts: postgres
+  roles:
+    - postgres
+
+- name: Setup Redis cluster
+  hosts: redis
+  roles:
+    - redis
+
+- name: Setup Kubernetes master nodes
+  hosts: k8s_master
+  roles:
+    - k8s-master
+
+- name: Setup Kubernetes worker nodes
+  hosts: k8s_worker
+  roles:
+    - k8s-worker
+
+- name: Deploy MCTrack application
+  hosts: k8s_master[0]
+  roles:
+    - mctrack-deploy

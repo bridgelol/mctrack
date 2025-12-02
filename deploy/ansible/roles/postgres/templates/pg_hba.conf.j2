@@ -1,0 +1,17 @@
+# PostgreSQL Client Authentication Configuration
+
+# Local connections
+local   all             postgres                                peer
+local   all             all                                     peer
+
+# IPv4 local connections
+host    all             all             127.0.0.1/32            scram-sha-256
+
+# Replication connections
+host    replication     replicator      {{ hostvars[groups['postgres'][1]]['ansible_host'] }}/32    scram-sha-256
+
+# K8s cluster connections
+host    mctrack         mctrack         10.0.0.0/16             scram-sha-256
+
+# Allow from internal network
+host    all             all             10.0.0.0/8              scram-sha-256

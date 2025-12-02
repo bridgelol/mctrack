@@ -1,0 +1,36 @@
+# Dependencies
+node_modules
+**/node_modules
+
+# Build outputs
+**/dist
+**/.next
+**/out
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Tilt
+tilt_modules/
+
+# Logs
+*.log
+logs/
+
+# Test coverage
+**/coverage
+
+# Lock files can be committed but not in draft
+# pnpm-lock.yaml

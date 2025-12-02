@@ -1,0 +1,53 @@
+---
+# MCTrack Cluster Configuration
+
+# General
+domain: mctrack.example.com
+environment: production
+
+# Kubernetes Configuration
+k8s_version: "1.28"
+k8s_pod_network_cidr: "10.244.0.0/16"
+k8s_service_cidr: "10.96.0.0/12"
+
+# Container Runtime
+containerd_version: "1.7.0"
+
+# ClickHouse Configuration
+clickhouse_version: "23.8"
+clickhouse_cluster_name: "mctrack_cluster"
+clickhouse_http_port: 8123
+clickhouse_tcp_port: 9000
+clickhouse_interserver_port: 9009
+clickhouse_data_dir: /data/clickhouse
+clickhouse_retention_days: 365
+
+# PostgreSQL Configuration
+postgres_version: "16"
+postgres_port: 5432
+postgres_data_dir: /data/postgres
+postgres_max_connections: 200
+
+# Redis Configuration
+redis_version: "7.2"
+redis_port: 6379
+redis_cluster_enabled: true
+
+# Storage
+data_disk: /dev/sdb
+data_mount_point: /data
+
+# TLS Configuration
+tls_enabled: true
+letsencrypt_email: admin@mctrack.example.com
+
+# Monitoring
+prometheus_enabled: true
+grafana_enabled: true
+alertmanager_enabled: true
+
+# Backup Configuration
+backup_enabled: true
+backup_schedule: "0 2 * * *"
+backup_retention_days: 30
+backup_s3_bucket: mctrack-backups

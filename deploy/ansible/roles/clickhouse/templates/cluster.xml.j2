@@ -1,0 +1,31 @@
+<?xml version="1.0"?>
+<clickhouse>
+    <remote_servers>
+        <{{ clickhouse_cluster_name }}>
+            <shard>
+                <internal_replication>true</internal_replication>
+{% for host in groups['clickhouse'] %}
+                <replica>
+                    <host>{{ hostvars[host]['ansible_host'] }}</host>
+                    <port>{{ clickhouse_tcp_port }}</port>
+                </replica>
+{% endfor %}
+            </shard>
+        </{{ clickhouse_cluster_name }}>
+    </remote_servers>
+
+    <zookeeper>
+{% for host in groups['clickhouse'] %}
+        <node>
+            <host>{{ hostvars[host]['ansible_host'] }}</host>
+            <port>2181</port>
+        </node>
+{% endfor %}
+    </zookeeper>
+
+    <macros>
+        <cluster>{{ clickhouse_cluster_name }}</cluster>
+        <shard>1</shard>
+        <replica>{{ inventory_hostname }}</replica>
+    </macros>
+</clickhouse>
