@@ -6,6 +6,7 @@ import { PermissionGroups } from '@mctrack/shared';
 import { authenticate, AuthenticatedRequest } from '../middleware/auth.js';
 import { validateBody } from '../middleware/validate.js';
 import { ApiError } from '../middleware/error-handler.js';
+import { membershipService } from '../services/membership.js';
 
 const router: IRouter = Router();
 
@@ -131,6 +132,25 @@ router.post('/', authenticate, validateBody(createNetworkSchema), async (req, re
       ...r,
       permissions: [...r.permissions],
     })));
+
+    // Find the Admin role we just created and add owner as member
+    const adminRole = await db.query.networkRoles.findFirst({
+      where: and(
+        eq(networkRoles.networkId, network.id),
+        eq(networkRoles.name, 'Admin')
+      ),
+    });
+
+    if (adminRole) {
+      await db.insert(networkMembers).values({
+        networkId: network.id,
+        userId,
+        roleId: adminRole.id,
+      });
+
+      // Invalidate membership cache for the user
+      await membershipService.invalidateCache(userId, network.id);
+    }
 
     res.status(201).json({ network });
   } catch (error) {
