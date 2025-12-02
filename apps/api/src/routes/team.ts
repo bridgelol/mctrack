@@ -220,15 +220,38 @@ router.delete(
     try {
       const { networkId, memberId } = req.params;
 
+      // Get network to check owner
+      const network = await db.query.networks.findFirst({
+        where: eq(networks.id, networkId),
+      });
+
+      if (!network) {
+        throw new ApiError(404, 'NETWORK_NOT_FOUND', 'Network not found');
+      }
+
+      // Get the member to check if they are the owner
+      const member = await db.query.networkMembers.findFirst({
+        where: and(
+          eq(networkMembers.id, memberId),
+          eq(networkMembers.networkId, networkId)
+        ),
+      });
+
+      if (!member) {
+        throw new ApiError(404, 'MEMBER_NOT_FOUND', 'Member not found');
+      }
+
+      // Prevent removing owner
+      if (member.userId === network.ownerId) {
+        throw new ApiError(400, 'CANNOT_REMOVE_OWNER', 'Cannot remove the network owner. Transfer ownership first.');
+      }
+
       await db
         .delete(networkMembers)
-        .where(and(
-          eq(networkMembers.networkId, networkId),
-          eq(networkMembers.userId, memberId)
-        ));
+        .where(eq(networkMembers.id, memberId));
 
       // Invalidate cache
-      await membershipService.invalidateCache(memberId, networkId);
+      await membershipService.invalidateCache(member.userId, networkId);
 
       res.status(204).send();
     } catch (error) {
@@ -397,6 +420,32 @@ router.patch(
       const { networkId, memberId } = req.params;
       const { roleId } = req.body;
 
+      // Get network to check owner
+      const network = await db.query.networks.findFirst({
+        where: eq(networks.id, networkId),
+      });
+
+      if (!network) {
+        throw new ApiError(404, 'NETWORK_NOT_FOUND', 'Network not found');
+      }
+
+      // Get the member to check if they are the owner
+      const existingMember = await db.query.networkMembers.findFirst({
+        where: and(
+          eq(networkMembers.id, memberId),
+          eq(networkMembers.networkId, networkId)
+        ),
+      });
+
+      if (!existingMember) {
+        throw new ApiError(404, 'MEMBER_NOT_FOUND', 'Member not found');
+      }
+
+      // Prevent changing owner's role
+      if (existingMember.userId === network.ownerId) {
+        throw new ApiError(400, 'CANNOT_CHANGE_OWNER_ROLE', 'Cannot change the network owner\'s role');
+      }
+
       // Verify role belongs to network
       const role = await db.query.networkRoles.findFirst({
         where: and(
@@ -417,10 +466,6 @@ router.patch(
           eq(networkMembers.networkId, networkId)
         ))
         .returning();
-
-      if (!member) {
-        throw new ApiError(404, 'MEMBER_NOT_FOUND', 'Member not found');
-      }
 
       // Invalidate cache
       await membershipService.invalidateCache(member.userId, networkId);
@@ -532,6 +577,94 @@ router.delete(
         ));
 
       res.status(204).send();
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * @swagger
+ * /networks/{networkId}/team/transfer-ownership:
+ *   post:
+ *     summary: Transfer network ownership to another member
+ *     tags: [Team]
+ */
+const transferOwnershipSchema = z.object({
+  newOwnerId: z.string().uuid(),
+});
+
+router.post(
+  '/transfer-ownership',
+  authenticate,
+  validateBody(transferOwnershipSchema),
+  async (req, res, next) => {
+    try {
+      const { networkId } = req.params;
+      const { userId } = req as AuthenticatedRequest;
+      const { newOwnerId } = req.body;
+
+      // Get network
+      const network = await db.query.networks.findFirst({
+        where: eq(networks.id, networkId),
+      });
+
+      if (!network) {
+        throw new ApiError(404, 'NETWORK_NOT_FOUND', 'Network not found');
+      }
+
+      // Only current owner can transfer ownership
+      if (network.ownerId !== userId) {
+        throw new ApiError(403, 'FORBIDDEN', 'Only the network owner can transfer ownership');
+      }
+
+      // Can't transfer to yourself
+      if (newOwnerId === userId) {
+        throw new ApiError(400, 'INVALID_TRANSFER', 'Cannot transfer ownership to yourself');
+      }
+
+      // Verify new owner is a member
+      const newOwnerMember = await db.query.networkMembers.findFirst({
+        where: and(
+          eq(networkMembers.networkId, networkId),
+          eq(networkMembers.userId, newOwnerId)
+        ),
+      });
+
+      if (!newOwnerMember) {
+        throw new ApiError(400, 'INVALID_TRANSFER', 'New owner must be a member of the network');
+      }
+
+      // Get the Admin role
+      const adminRole = await db.query.networkRoles.findFirst({
+        where: and(
+          eq(networkRoles.networkId, networkId),
+          eq(networkRoles.name, 'Admin')
+        ),
+      });
+
+      // Transfer ownership
+      await db
+        .update(networks)
+        .set({ ownerId: newOwnerId })
+        .where(eq(networks.id, networkId));
+
+      // Update new owner's role to Admin if there is an Admin role
+      if (adminRole) {
+        await db
+          .update(networkMembers)
+          .set({ roleId: adminRole.id })
+          .where(and(
+            eq(networkMembers.networkId, networkId),
+            eq(networkMembers.userId, newOwnerId)
+          ));
+      }
+
+      // Invalidate caches
+      await membershipService.invalidateCache(userId, networkId);
+      await membershipService.invalidateCache(newOwnerId, networkId);
+
+      res.json({ success: true, newOwnerId });
     } catch (error) {
       next(error);
     }

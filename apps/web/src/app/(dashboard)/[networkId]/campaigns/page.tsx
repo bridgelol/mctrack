@@ -9,8 +9,8 @@ interface Campaign {
   id: string;
   name: string;
   domainFilter: string;
-  startDate: string;
-  endDate: string;
+  startTime: string;
+  endTime: string;
   budgetType: 'daily' | 'total';
   budgetAmount: string | number;
   currency: string;
@@ -64,19 +64,27 @@ export default function CampaignsPage() {
 
   const isActive = (campaign: Campaign) => {
     const now = new Date();
-    const start = new Date(campaign.startDate);
-    const end = new Date(campaign.endDate);
+    const start = new Date(campaign.startTime);
+    const end = new Date(campaign.endTime);
     return !campaign.archivedAt && now >= start && now <= end;
   };
 
   const getStatus = (campaign: Campaign) => {
     if (campaign.archivedAt) return { label: 'Archived', class: 'badge-ghost' };
     const now = new Date();
-    const start = new Date(campaign.startDate);
-    const end = new Date(campaign.endDate);
+    const start = new Date(campaign.startTime);
+    const end = new Date(campaign.endTime);
     if (now < start) return { label: 'Scheduled', class: 'badge-info' };
     if (now > end) return { label: 'Ended', class: 'badge-warning' };
     return { label: 'Active', class: 'badge-success' };
+  };
+
+  const formatDateTime = (dateStr: string) => {
+    const date = new Date(dateStr);
+    return date.toLocaleString(undefined, {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+    });
   };
 
   return (
@@ -132,7 +140,7 @@ export default function CampaignsPage() {
                         </span>
                       </h3>
                       <p className="text-sm text-base-content/60">
-                        {new Date(campaign.startDate).toLocaleDateString()} - {new Date(campaign.endDate).toLocaleDateString()}
+                        {formatDateTime(campaign.startTime)} - {formatDateTime(campaign.endTime)}
                         {campaign.domainFilter && ` • ${campaign.domainFilter}`}
                       </p>
                     </div>
@@ -226,11 +234,18 @@ interface CampaignModalProps {
 }
 
 function CampaignModal({ campaign, onClose, onSave, isLoading }: CampaignModalProps) {
+  // Helper to format datetime for input
+  const toDateTimeLocal = (isoString: string | undefined) => {
+    if (!isoString) return '';
+    const date = new Date(isoString);
+    return date.toISOString().slice(0, 16);
+  };
+
   const [formData, setFormData] = useState({
     name: campaign?.name || '',
     domainFilter: campaign?.domainFilter || '',
-    startDate: campaign?.startDate?.split('T')[0] || new Date().toISOString().split('T')[0],
-    endDate: campaign?.endDate?.split('T')[0] || '',
+    startTime: toDateTimeLocal(campaign?.startTime) || new Date().toISOString().slice(0, 16),
+    endTime: toDateTimeLocal(campaign?.endTime) || '',
     budgetType: campaign?.budgetType || 'daily',
     budgetAmount: Number(campaign?.budgetAmount) || 0,
     currency: campaign?.currency || 'USD',
@@ -282,25 +297,26 @@ function CampaignModal({ campaign, onClose, onSave, isLoading }: CampaignModalPr
           <div className="grid grid-cols-2 gap-4">
             <div className="form-control">
               <label className="label">
-                <span className="label-text">Start Date</span>
+                <span className="label-text">Start Time</span>
               </label>
               <input
-                type="date"
+                type="datetime-local"
                 className="input input-bordered"
-                value={formData.startDate}
-                onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+                value={formData.startTime}
+                onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
                 required
               />
             </div>
             <div className="form-control">
               <label className="label">
-                <span className="label-text">End Date</span>
+                <span className="label-text">End Time</span>
               </label>
               <input
-                type="date"
+                type="datetime-local"
                 className="input input-bordered"
-                value={formData.endDate}
-                onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
+                value={formData.endTime}
+                min={formData.startTime}
+                onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
                 required
               />
             </div>

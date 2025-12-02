@@ -11,7 +11,6 @@ interface Network {
   timezone: string;
   settings: {
     currency?: string;
-    retentionDays?: number;
   };
   creationTime: string;
 }
@@ -31,7 +30,7 @@ export default function SettingsPage() {
     queryFn: () => api.get(`/networks/${networkId}`),
   });
 
-  const [formData, setFormData] = useState<Partial<Network & { currency?: string; retentionDays?: number }>>({});
+  const [formData, setFormData] = useState<Partial<Network & { currency?: string }>>({});
 
   const updateMutation = useMutation({
     mutationFn: (updateData: Partial<Network>) =>
@@ -49,11 +48,10 @@ export default function SettingsPage() {
     const payload: Record<string, unknown> = {};
     if (formData.name) payload.name = formData.name;
     if (formData.timezone) payload.timezone = formData.timezone;
-    if (formData.currency || formData.retentionDays) {
+    if (formData.currency) {
       payload.settings = {
         ...settings?.settings,
-        ...(formData.currency && { currency: formData.currency }),
-        ...(formData.retentionDays && { retentionDays: formData.retentionDays }),
+        currency: formData.currency,
       };
     }
     updateMutation.mutate(payload as Partial<Network>);
@@ -70,7 +68,6 @@ export default function SettingsPage() {
   const currentName = formData.name ?? settings?.name ?? '';
   const currentTimezone = formData.timezone ?? settings?.timezone ?? 'UTC';
   const currentCurrency = formData.currency ?? settings?.settings?.currency ?? 'USD';
-  const currentRetentionDays = formData.retentionDays ?? settings?.settings?.retentionDays ?? 365;
 
   return (
     <div className="space-y-6">
@@ -142,30 +139,6 @@ export default function SettingsPage() {
                   <option value="JPY">JPY - Japanese Yen</option>
                 </select>
               </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Data Retention */}
-        <div className="card bg-base-200">
-          <div className="card-body">
-            <h2 className="card-title text-lg">Data Retention</h2>
-
-            <div className="form-control max-w-xs">
-              <label className="label">
-                <span className="label-text">Retention Period (days)</span>
-              </label>
-              <input
-                type="number"
-                className="input input-bordered"
-                min="30"
-                max="730"
-                value={currentRetentionDays}
-                onChange={(e) => setFormData({ ...formData, retentionDays: parseInt(e.target.value) })}
-              />
-              <label className="label">
-                <span className="label-text-alt">Raw session data older than this will be archived. Aggregated data is kept indefinitely.</span>
-              </label>
             </div>
           </div>
         </div>

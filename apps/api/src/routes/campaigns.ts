@@ -78,14 +78,14 @@ router.get(
 const createCampaignSchema = z.object({
   name: z.string().min(1).max(100),
   domainFilter: z.string().min(1).max(255),
-  startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  startTime: z.string().datetime({ offset: true }).or(z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/)),
+  endTime: z.string().datetime({ offset: true }).or(z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/)),
   budgetType: z.enum([BudgetType.DAILY, BudgetType.TOTAL]),
   budgetAmount: z.number().positive(),
   currency: z.string().length(3).default('USD'),
 }).refine(
-  (data) => new Date(data.endDate) >= new Date(data.startDate),
-  { message: 'End date cannot be before start date', path: ['endDate'] }
+  (data) => new Date(data.endTime) >= new Date(data.startTime),
+  { message: 'End time cannot be before start time', path: ['endTime'] }
 );
 
 router.post(
@@ -161,8 +161,8 @@ router.get(
  */
 const updateCampaignSchema = z.object({
   name: z.string().min(1).max(100).optional(),
-  domainFilter: z.string().nullable().optional(),
-  endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  domainFilter: z.string().min(1).max(255).optional(),
+  endTime: z.string().datetime({ offset: true }).or(z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/)).optional(),
   budgetAmount: z.number().positive().optional(),
 });
 

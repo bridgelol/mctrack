@@ -190,8 +190,8 @@ export const campaigns = pgTable('campaigns', {
   networkId: uuid('network_id').notNull().references(() => networks.id, { onDelete: 'cascade' }),
   name: varchar('name', { length: 100 }).notNull(),
   domainFilter: varchar('domain_filter', { length: 255 }).notNull(),
-  startDate: date('start_date').notNull(),
-  endDate: date('end_date').notNull(),
+  startTime: timestamp('start_time').notNull(),
+  endTime: timestamp('end_time').notNull(),
   budgetType: budgetTypeEnum('budget_type').notNull(),
   budgetAmount: decimal('budget_amount', { precision: 10, scale: 2 }).notNull(),
   currency: varchar('currency', { length: 3 }).notNull().default('USD'),
@@ -199,7 +199,7 @@ export const campaigns = pgTable('campaigns', {
   archivedAt: timestamp('archived_at'),
 }, (table) => [
   index('campaigns_network_id_idx').on(table.networkId),
-  index('campaigns_dates_idx').on(table.startDate, table.endDate),
+  index('campaigns_times_idx').on(table.startTime, table.endTime),
 ]);
 
 export const campaignSpends = pgTable('campaign_spends', {
