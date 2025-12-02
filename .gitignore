@@ -34,3 +34,4 @@ logs/
 
 # Lock files can be committed but not in draft
 # pnpm-lock.yaml
+*.iml
