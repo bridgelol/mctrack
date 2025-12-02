@@ -155,8 +155,7 @@ CREATE TABLE IF NOT EXISTS network_sessions (
   end_time Nullable(DateTime64(3))
 ) ENGINE = MergeTree()
 PARTITION BY toYYYYMM(start_time)
-ORDER BY (network_id, start_time, session_uuid)
-TTL start_time + INTERVAL 2 YEAR;
+ORDER BY (network_id, start_time, session_uuid);
 
 -- GameMode Sessions
 CREATE TABLE IF NOT EXISTS gamemode_sessions (
@@ -170,8 +169,7 @@ CREATE TABLE IF NOT EXISTS gamemode_sessions (
   end_time Nullable(DateTime64(3))
 ) ENGINE = MergeTree()
 PARTITION BY toYYYYMM(start_time)
-ORDER BY (gamemode_id, start_time, session_uuid)
-TTL start_time + INTERVAL 2 YEAR;
+ORDER BY (gamemode_id, start_time, session_uuid);
 
 -- Payments
 CREATE TABLE IF NOT EXISTS payments (
