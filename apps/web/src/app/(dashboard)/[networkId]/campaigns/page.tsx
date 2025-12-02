@@ -8,15 +8,15 @@ import { api } from '@/lib/api';
 interface Campaign {
   id: string;
   name: string;
-  domainFilter: string | null;
+  domainFilter: string;
   startDate: string;
   endDate: string;
   budgetType: 'daily' | 'total';
-  budgetAmount: number;
+  budgetAmount: string | number;
   currency: string;
   createdAt: string;
   archivedAt: string | null;
-  stats: {
+  stats?: {
     attributedPlayers: number;
     totalRevenue: number;
     totalSpend: number;
@@ -172,7 +172,7 @@ export default function CampaignsPage() {
                     <div>
                       <div className="text-sm text-base-content/60">Budget</div>
                       <div className="font-medium">
-                        {campaign.currency} {campaign.budgetAmount.toFixed(2)}
+                        {campaign.currency} {Number(campaign.budgetAmount).toFixed(2)}
                         <span className="text-xs text-base-content/60 ml-1">
                           {campaign.budgetType === 'daily' ? '/day' : 'total'}
                         </span>
@@ -180,18 +180,18 @@ export default function CampaignsPage() {
                     </div>
                     <div>
                       <div className="text-sm text-base-content/60">Players</div>
-                      <div className="font-medium">{campaign.stats.attributedPlayers.toLocaleString()}</div>
+                      <div className="font-medium">{(campaign.stats?.attributedPlayers ?? 0).toLocaleString()}</div>
                     </div>
                     <div>
                       <div className="text-sm text-base-content/60">Revenue</div>
                       <div className="font-medium text-success">
-                        ${campaign.stats.totalRevenue.toFixed(2)}
+                        ${(campaign.stats?.totalRevenue ?? 0).toFixed(2)}
                       </div>
                     </div>
                     <div>
                       <div className="text-sm text-base-content/60">ROI</div>
-                      <div className={`font-medium ${campaign.stats.roi >= 0 ? 'text-success' : 'text-error'}`}>
-                        {campaign.stats.roi >= 0 ? '+' : ''}{campaign.stats.roi.toFixed(1)}%
+                      <div className={`font-medium ${(campaign.stats?.roi ?? 0) >= 0 ? 'text-success' : 'text-error'}`}>
+                        {(campaign.stats?.roi ?? 0) >= 0 ? '+' : ''}{(campaign.stats?.roi ?? 0).toFixed(1)}%
                       </div>
                     </div>
                   </div>
@@ -232,16 +232,13 @@ function CampaignModal({ campaign, onClose, onSave, isLoading }: CampaignModalPr
     startDate: campaign?.startDate?.split('T')[0] || new Date().toISOString().split('T')[0],
     endDate: campaign?.endDate?.split('T')[0] || '',
     budgetType: campaign?.budgetType || 'daily',
-    budgetAmount: campaign?.budgetAmount || 0,
+    budgetAmount: Number(campaign?.budgetAmount) || 0,
     currency: campaign?.currency || 'USD',
   });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSave({
-      ...formData,
-      domainFilter: formData.domainFilter || null,
-    } as Partial<Campaign>);
+    onSave(formData as Partial<Campaign>);
   };
 
   return (
@@ -267,7 +264,7 @@ function CampaignModal({ campaign, onClose, onSave, isLoading }: CampaignModalPr
 
           <div className="form-control">
             <label className="label">
-              <span className="label-text">Domain Filter (optional)</span>
+              <span className="label-text">Domain Filter</span>
             </label>
             <input
               type="text"
@@ -275,9 +272,10 @@ function CampaignModal({ campaign, onClose, onSave, isLoading }: CampaignModalPr
               placeholder="e.g., play.example.com"
               value={formData.domainFilter}
               onChange={(e) => setFormData({ ...formData, domainFilter: e.target.value })}
+              required
             />
             <label className="label">
-              <span className="label-text-alt">Leave empty to track all domains</span>
+              <span className="label-text-alt">Domain to attribute players joining from this campaign</span>
             </label>
           </div>
 
