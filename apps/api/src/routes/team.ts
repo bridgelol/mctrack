@@ -82,6 +82,7 @@ router.get(
           createdAt: i.createdAt,
         })),
         isOwner,
+        ownerId: network?.ownerId,
       });
     } catch (error) {
       next(error);
