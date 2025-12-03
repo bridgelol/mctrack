@@ -4,8 +4,16 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'next/navigation';
 import { api } from '@/lib/api';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent } from '@/components/ui/card';
+import { Modal, ModalFooter } from '@/components/ui/modal';
+import { EmptyState } from '@/components/ui/empty-state';
+import { Webhook, Plus, MoreVertical, Play, Pencil, Trash2, Clock, AlertCircle } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
-interface Webhook {
+interface WebhookData {
   id: string;
   name: string;
   url: string;
@@ -18,7 +26,7 @@ interface Webhook {
 }
 
 interface WebhooksResponse {
-  webhooks: Webhook[];
+  webhooks: WebhookData[];
 }
 
 const AVAILABLE_EVENTS = [
@@ -38,7 +46,8 @@ export default function WebhooksPage() {
   const queryClient = useQueryClient();
 
   const [showModal, setShowModal] = useState(false);
-  const [editingWebhook, setEditingWebhook] = useState<Webhook | null>(null);
+  const [editingWebhook, setEditingWebhook] = useState<WebhookData | null>(null);
+  const [openDropdown, setOpenDropdown] = useState<string | null>(null);
 
   const { data, isLoading } = useQuery<WebhooksResponse>({
     queryKey: ['webhooks', networkId],
@@ -80,161 +89,199 @@ export default function WebhooksPage() {
 
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return 'Never';
-    return new Date(dateStr).toLocaleString();
+    return new Date(dateStr).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    });
   };
 
   if (isLoading) {
     return (
-      <div className="flex justify-center py-12">
-        <span className="loading loading-spinner loading-lg" />
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <div className="space-y-2">
+            <div className="h-8 w-32 bg-gray-800 rounded-lg animate-pulse" />
+            <div className="h-4 w-64 bg-gray-800 rounded animate-pulse" />
+          </div>
+          <div className="h-10 w-40 bg-gray-800 rounded-lg animate-pulse" />
+        </div>
+        <div className="space-y-3">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-32 bg-gray-900 rounded-xl border border-gray-800 animate-pulse" />
+          ))}
+        </div>
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      {/* Header */}
+      <div className="flex justify-between items-start">
         <div>
-          <h1 className="text-2xl font-bold">Webhooks</h1>
-          <p className="text-base-content/60">
+          <h1 className="text-2xl font-bold text-gray-50">Webhooks</h1>
+          <p className="text-sm text-gray-400 mt-1">
             Send real-time notifications to external services
           </p>
         </div>
-        <button
-          className="btn btn-primary btn-sm"
-          onClick={() => {
-            setEditingWebhook(null);
-            setShowModal(true);
-          }}
-        >
-          + Create Webhook
-        </button>
+        <Button onClick={() => { setEditingWebhook(null); setShowModal(true); }}>
+          <Plus className="h-4 w-4 mr-2" />
+          Create Webhook
+        </Button>
       </div>
 
       {/* Webhooks List */}
       {data?.webhooks.length === 0 ? (
-        <div className="text-center py-12">
-          <p className="text-base-content/60 mb-4">No webhooks configured</p>
-          <button className="btn btn-primary" onClick={() => setShowModal(true)}>
-            Create your first webhook
-          </button>
-        </div>
+        <EmptyState
+          icon={Webhook}
+          title="No webhooks configured"
+          description="Create a webhook to send real-time event notifications to your services"
+          action={{
+            label: 'Create Webhook',
+            onClick: () => setShowModal(true),
+          }}
+        />
       ) : (
-        <div className="grid gap-4">
+        <div className="space-y-3">
           {data?.webhooks.map((webhook) => (
-            <div key={webhook.id} className="card bg-base-200">
-              <div className="card-body">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <h3 className="font-medium flex items-center gap-2">
-                      {webhook.name}
-                      {webhook.isActive ? (
-                        <span className="badge badge-success badge-sm">Active</span>
-                      ) : (
-                        <span className="badge badge-ghost badge-sm">Inactive</span>
-                      )}
-                      {webhook.failureCount > 0 && (
-                        <span className="badge badge-error badge-sm">
-                          {webhook.failureCount} failures
-                        </span>
-                      )}
-                    </h3>
-                    <p className="text-sm text-base-content/60 font-mono break-all">
-                      {webhook.url}
-                    </p>
+            <Card key={webhook.id} padding="none" className="group">
+              <CardContent className="p-4">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-start gap-4 flex-1 min-w-0">
+                    <div className={cn(
+                      "h-10 w-10 rounded-lg flex items-center justify-center flex-shrink-0",
+                      webhook.isActive ? "bg-success-500/20" : "bg-gray-800"
+                    )}>
+                      <Webhook className={cn(
+                        "h-5 w-5",
+                        webhook.isActive ? "text-success-400" : "text-gray-500"
+                      )} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="font-semibold text-gray-50">{webhook.name}</h3>
+                        <Badge variant={webhook.isActive ? 'success' : 'gray'} size="sm" dot>
+                          {webhook.isActive ? 'Active' : 'Inactive'}
+                        </Badge>
+                        {webhook.failureCount > 0 && (
+                          <Badge variant="error" size="sm">
+                            <AlertCircle className="h-3 w-3 mr-1" />
+                            {webhook.failureCount} failures
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="text-sm text-gray-500 font-mono mt-1 truncate">
+                        {webhook.url}
+                      </p>
+                      <div className="flex flex-wrap gap-1.5 mt-2">
+                        {webhook.events.slice(0, 3).map((event) => (
+                          <Badge key={event} variant="outline" size="sm">
+                            {AVAILABLE_EVENTS.find(e => e.id === event)?.label || event}
+                          </Badge>
+                        ))}
+                        {webhook.events.length > 3 && (
+                          <Badge variant="gray" size="sm">
+                            +{webhook.events.length - 3} more
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="text-xs text-gray-500 mt-2 flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        Last triggered: {formatDate(webhook.lastTriggeredAt)}
+                      </p>
+                    </div>
                   </div>
-
-                  <div className="flex gap-2">
-                    <button
-                      className="btn btn-ghost btn-sm"
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
                       onClick={() => testMutation.mutate(webhook.id)}
                       disabled={testMutation.isPending}
+                      isLoading={testMutation.isPending}
                     >
-                      {testMutation.isPending ? (
-                        <span className="loading loading-spinner loading-xs" />
-                      ) : (
-                        'Test'
+                      <Play className="h-4 w-4 mr-1" />
+                      Test
+                    </Button>
+                    <div className="relative">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => setOpenDropdown(openDropdown === webhook.id ? null : webhook.id)}
+                      >
+                        <MoreVertical className="h-4 w-4" />
+                      </Button>
+                      {openDropdown === webhook.id && (
+                        <>
+                          <div className="fixed inset-0 z-40" onClick={() => setOpenDropdown(null)} />
+                          <div className="absolute right-0 mt-1 w-40 z-50 rounded-lg border border-gray-800 bg-gray-900 shadow-xl py-1">
+                            <button
+                              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-300 hover:bg-gray-800"
+                              onClick={() => {
+                                setEditingWebhook(webhook);
+                                setShowModal(true);
+                                setOpenDropdown(null);
+                              }}
+                            >
+                              <Pencil className="h-4 w-4" />
+                              Edit
+                            </button>
+                            <button
+                              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-300 hover:bg-gray-800"
+                              onClick={() => {
+                                toggleMutation.mutate({ id: webhook.id, isActive: !webhook.isActive });
+                                setOpenDropdown(null);
+                              }}
+                            >
+                              {webhook.isActive ? 'Disable' : 'Enable'}
+                            </button>
+                            <button
+                              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-error-400 hover:bg-gray-800"
+                              onClick={() => {
+                                if (confirm('Are you sure you want to delete this webhook?')) {
+                                  deleteMutation.mutate(webhook.id);
+                                }
+                                setOpenDropdown(null);
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                              Delete
+                            </button>
+                          </div>
+                        </>
                       )}
-                    </button>
-                    <div className="dropdown dropdown-end">
-                      <label tabIndex={0} className="btn btn-ghost btn-sm btn-square">
-                        ⋮
-                      </label>
-                      <ul tabIndex={0} className="dropdown-content menu p-2 shadow bg-base-300 rounded-box w-40">
-                        <li>
-                          <button onClick={() => {
-                            setEditingWebhook(webhook);
-                            setShowModal(true);
-                          }}>
-                            Edit
-                          </button>
-                        </li>
-                        <li>
-                          <button onClick={() => toggleMutation.mutate({
-                            id: webhook.id,
-                            isActive: !webhook.isActive,
-                          })}>
-                            {webhook.isActive ? 'Disable' : 'Enable'}
-                          </button>
-                        </li>
-                        <li>
-                          <button
-                            className="text-error"
-                            onClick={() => {
-                              if (confirm('Are you sure you want to delete this webhook?')) {
-                                deleteMutation.mutate(webhook.id);
-                              }
-                            }}
-                          >
-                            Delete
-                          </button>
-                        </li>
-                      </ul>
                     </div>
                   </div>
                 </div>
-
-                <div className="flex flex-wrap gap-1 mt-2">
-                  {webhook.events.map((event) => (
-                    <span key={event} className="badge badge-sm badge-outline">
-                      {event}
-                    </span>
-                  ))}
-                </div>
-
-                <div className="text-sm text-base-content/60 mt-2">
-                  Last triggered: {formatDate(webhook.lastTriggeredAt)}
-                </div>
-              </div>
-            </div>
+              </CardContent>
+            </Card>
           ))}
         </div>
       )}
 
       {/* Create/Edit Modal */}
-      {showModal && (
-        <WebhookModal
-          webhook={editingWebhook}
-          onClose={() => {
-            setShowModal(false);
-            setEditingWebhook(null);
-          }}
-          onSave={(data) => createMutation.mutate(data)}
-          isLoading={createMutation.isPending}
-        />
-      )}
+      <WebhookModal
+        isOpen={showModal}
+        webhook={editingWebhook}
+        onClose={() => { setShowModal(false); setEditingWebhook(null); }}
+        onSave={(data) => createMutation.mutate(data)}
+        isLoading={createMutation.isPending}
+      />
     </div>
   );
 }
 
 interface WebhookModalProps {
-  webhook: Webhook | null;
+  isOpen: boolean;
+  webhook: WebhookData | null;
   onClose: () => void;
   onSave: (data: { name: string; url: string; events: string[]; secret?: string }) => void;
   isLoading: boolean;
 }
 
-function WebhookModal({ webhook, onClose, onSave, isLoading }: WebhookModalProps) {
+function WebhookModal({ isOpen, webhook, onClose, onSave, isLoading }: WebhookModalProps) {
   const [name, setName] = useState(webhook?.name || '');
   const [url, setUrl] = useState(webhook?.url || '');
   const [events, setEvents] = useState<string[]>(webhook?.events || []);
@@ -256,100 +303,86 @@ function WebhookModal({ webhook, onClose, onSave, isLoading }: WebhookModalProps
     });
   };
 
+  const handleClose = () => {
+    setName(webhook?.name || '');
+    setUrl(webhook?.url || '');
+    setEvents(webhook?.events || []);
+    setSecret('');
+    onClose();
+  };
+
   return (
-    <dialog className="modal modal-open">
-      <div className="modal-box max-w-2xl">
-        <h3 className="font-bold text-lg">{webhook ? 'Edit Webhook' : 'Create Webhook'}</h3>
+    <Modal isOpen={isOpen} onClose={handleClose} title={webhook ? 'Edit Webhook' : 'Create Webhook'} size="lg">
+      <form onSubmit={handleSubmit} className="space-y-5">
+        <Input
+          label="Name"
+          placeholder="e.g., Discord Notifications"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          required
+        />
 
-        <form onSubmit={handleSubmit} className="space-y-4 mt-4">
-          <div className="form-control">
-            <label className="label">
-              <span className="label-text">Name</span>
-            </label>
-            <input
-              type="text"
-              className="input input-bordered"
-              placeholder="e.g., Discord Notifications"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-            />
-          </div>
+        <Input
+          label="URL"
+          type="url"
+          placeholder="https://example.com/webhook"
+          value={url}
+          onChange={(e) => setUrl(e.target.value)}
+          required
+        />
 
-          <div className="form-control">
-            <label className="label">
-              <span className="label-text">URL</span>
-            </label>
-            <input
-              type="url"
-              className="input input-bordered"
-              placeholder="https://example.com/webhook"
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              required
-            />
-          </div>
+        <Input
+          label="Secret (optional)"
+          type="password"
+          placeholder={webhook?.secret ? '••••••••' : 'Enter a secret for signature verification'}
+          value={secret}
+          onChange={(e) => setSecret(e.target.value)}
+          hint={webhook ? 'Leave blank to keep existing secret' : 'Used to sign webhook payloads'}
+        />
 
-          <div className="form-control">
-            <label className="label">
-              <span className="label-text">Secret (optional)</span>
-            </label>
-            <input
-              type="password"
-              className="input input-bordered"
-              placeholder={webhook?.secret ? '••••••••' : 'Enter a secret for signature verification'}
-              value={secret}
-              onChange={(e) => setSecret(e.target.value)}
-            />
-            <label className="label">
-              <span className="label-text-alt">
-                {webhook ? 'Leave blank to keep existing secret' : 'Used to sign webhook payloads'}
-              </span>
-            </label>
+        <div className="space-y-2">
+          <label className="text-sm font-medium text-gray-300">
+            Events
+          </label>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+            {AVAILABLE_EVENTS.map((event) => (
+              <label
+                key={event.id}
+                className={cn(
+                  'cursor-pointer flex items-start gap-3 rounded-lg px-3 py-2.5 border transition-colors',
+                  events.includes(event.id)
+                    ? 'border-brand-500/30 bg-brand-500/10'
+                    : 'border-gray-800 bg-gray-900 hover:bg-gray-800/50'
+                )}
+              >
+                <input
+                  type="checkbox"
+                  className="mt-0.5 rounded border-gray-600 text-brand-500 focus:ring-brand-500 focus:ring-offset-gray-900"
+                  checked={events.includes(event.id)}
+                  onChange={() => toggleEvent(event.id)}
+                />
+                <div>
+                  <span className="text-sm font-medium text-gray-200">{event.label}</span>
+                  <p className="text-xs text-gray-500">{event.description}</p>
+                </div>
+              </label>
+            ))}
           </div>
+        </div>
 
-          <div className="form-control">
-            <label className="label">
-              <span className="label-text">Events</span>
-            </label>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-              {AVAILABLE_EVENTS.map((event) => (
-                <label
-                  key={event.id}
-                  className="label cursor-pointer justify-start gap-2 bg-base-200 rounded-lg px-3"
-                >
-                  <input
-                    type="checkbox"
-                    className="checkbox checkbox-sm"
-                    checked={events.includes(event.id)}
-                    onChange={() => toggleEvent(event.id)}
-                  />
-                  <div>
-                    <span className="label-text font-medium">{event.label}</span>
-                    <p className="text-xs text-base-content/60">{event.description}</p>
-                  </div>
-                </label>
-              ))}
-            </div>
-          </div>
-
-          <div className="modal-action">
-            <button type="button" className="btn" onClick={onClose}>
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="btn btn-primary"
-              disabled={isLoading || events.length === 0}
-            >
-              {isLoading ? <span className="loading loading-spinner loading-sm" /> : 'Save'}
-            </button>
-          </div>
-        </form>
-      </div>
-      <form method="dialog" className="modal-backdrop">
-        <button onClick={onClose}>close</button>
+        <ModalFooter>
+          <Button type="button" variant="ghost" onClick={handleClose}>
+            Cancel
+          </Button>
+          <Button
+            type="submit"
+            disabled={isLoading || events.length === 0 || !name.trim() || !url.trim()}
+            isLoading={isLoading}
+          >
+            {webhook ? 'Save Changes' : 'Create Webhook'}
+          </Button>
+        </ModalFooter>
       </form>
-    </dialog>
+    </Modal>
   );
 }
