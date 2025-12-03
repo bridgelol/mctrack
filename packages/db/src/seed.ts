@@ -79,9 +79,7 @@ async function seed() {
     where: eq(networks.id, DEV_NETWORK_ID),
   });
 
-  if (existingNetwork) {
-    console.log('✓ Dev network already exists');
-  } else {
+  if (!existingNetwork) {
     // Create dev network with fixed ID
     const [network] = await db.insert(networks).values({
       id: DEV_NETWORK.id,
@@ -147,44 +145,62 @@ async function seed() {
     }
 
     console.log('✓ Created dev network:', DEV_NETWORK.name);
+  } else {
+    console.log('✓ Dev network already exists');
+  }
 
-    // Create gamemodes
-    for (const gamemode of DEV_GAMEMODES) {
+  // Create gamemodes (if they don't exist)
+  for (const gamemode of DEV_GAMEMODES) {
+    const existing = await db.query.gamemodes.findFirst({
+      where: eq(gamemodes.id, gamemode.id),
+    });
+    if (!existing) {
       await db.insert(gamemodes).values({
         id: gamemode.id,
-        networkId: network.id,
+        networkId: DEV_NETWORK_ID,
         name: gamemode.name,
       });
+      console.log(`✓ Created gamemode: ${gamemode.name}`);
     }
-    console.log(`✓ Created ${DEV_GAMEMODES.length} gamemodes: ${DEV_GAMEMODES.map(g => g.name).join(', ')}`);
+  }
 
-    // Create proxy API key (network-level, no gamemode)
-    const proxyKeyHash = hashApiKey(DEV_API_KEYS.proxy);
+  // Create proxy API key (network-level, no gamemode) if it doesn't exist
+  const proxyKeyHash = hashApiKey(DEV_API_KEYS.proxy);
+  const existingProxyKey = await db.query.apiKeys.findFirst({
+    where: eq(apiKeys.keyHash, proxyKeyHash),
+  });
+  if (!existingProxyKey) {
     await db.insert(apiKeys).values({
-      networkId: network.id,
+      networkId: DEV_NETWORK_ID,
       keyHash: proxyKeyHash,
       keyPrefix: DEV_API_KEYS.proxy.substring(0, 12),
       name: 'Proxy Server',
     });
+    console.log('✓ Created proxy API key');
+  }
 
-    // Create gamemode-specific API keys
-    const gamemodeKeyMap: { key: keyof typeof DEV_API_KEYS; gamemodeId: string; name: string }[] = [
-      { key: 'survival', gamemodeId: DEV_GAMEMODE_IDS.survival, name: 'Survival Server' },
-      { key: 'skyblock', gamemodeId: DEV_GAMEMODE_IDS.skyblock, name: 'SkyBlock Server' },
-      { key: 'prison', gamemodeId: DEV_GAMEMODE_IDS.prison, name: 'Prison Server' },
-    ];
+  // Create gamemode-specific API keys (if they don't exist)
+  const gamemodeKeyMap: { key: keyof typeof DEV_API_KEYS; gamemodeId: string; name: string }[] = [
+    { key: 'survival', gamemodeId: DEV_GAMEMODE_IDS.survival, name: 'Survival Server' },
+    { key: 'skyblock', gamemodeId: DEV_GAMEMODE_IDS.skyblock, name: 'SkyBlock Server' },
+    { key: 'prison', gamemodeId: DEV_GAMEMODE_IDS.prison, name: 'Prison Server' },
+  ];
 
-    for (const { key, gamemodeId, name } of gamemodeKeyMap) {
-      const keyHash = hashApiKey(DEV_API_KEYS[key]);
+  for (const { key, gamemodeId, name } of gamemodeKeyMap) {
+    const keyHash = hashApiKey(DEV_API_KEYS[key]);
+    const existingKey = await db.query.apiKeys.findFirst({
+      where: eq(apiKeys.keyHash, keyHash),
+    });
+    if (!existingKey) {
       await db.insert(apiKeys).values({
-        networkId: network.id,
+        networkId: DEV_NETWORK_ID,
         gamemodeId,
         keyHash,
         keyPrefix: DEV_API_KEYS[key].substring(0, 12),
         name,
       });
+      console.log(`✓ Created API key: ${name}`);
     }
-    console.log('✓ Created API keys for proxy + gamemodes');
   }
 
   console.log('\n' + '='.repeat(60));

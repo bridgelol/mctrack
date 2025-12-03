@@ -101,7 +101,7 @@ router.post('/start', apiKeyAuth, async (req, res, next) => {
       player_uuid: cleanUuid,
       proxy_id: null,
       gamemode_id: gamemodeId,
-      domain: data.domain,
+      domain: data.domain.toLowerCase(),
       ip_address: data.ipAddress,
       player_country: playerCountry,
       platform: data.platform,
@@ -262,13 +262,14 @@ router.post('/batch', apiKeyAuth, async (req, res, next) => {
         const now = event.timestamp ? new Date(event.timestamp) : new Date();
 
         // Add session to buffer for ClickHouse
+        const eventDomain = (event.joinDomain || event.domain || '').toLowerCase();
         addSession({
           network_id: networkId,
           session_uuid: sessionUuid,
           player_uuid: cleanUuid,
           proxy_id: null,
           gamemode_id: null,
-          domain: event.joinDomain || event.domain || '',
+          domain: eventDomain,
           ip_address: event.ipAddress || '0.0.0.0',
           player_country: playerCountry,
           platform: (event.platform?.toLowerCase() || 'java') as 'java' | 'bedrock',
