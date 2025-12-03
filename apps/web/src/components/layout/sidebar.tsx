@@ -84,22 +84,24 @@ export function Sidebar() {
     <aside className="w-64 bg-gray-900 border-r border-gray-800 flex flex-col h-full">
       {/* Logo & Network Selector */}
       <div className="p-4 border-b border-gray-800">
-        <Link
-          href="/networks"
-          className="flex items-center gap-3 group"
-        >
-          <div className="h-9 w-9 rounded-lg bg-brand-500 flex items-center justify-center">
+        <div className="flex items-center gap-3">
+          <Link
+            href="/"
+            className="h-9 w-9 rounded-lg bg-brand-500 flex items-center justify-center hover:bg-brand-600 transition-colors"
+          >
             <Network className="h-5 w-5 text-white" />
-          </div>
+          </Link>
           <div className="flex-1 min-w-0">
-            <h1 className="font-bold text-gray-50 text-sm">MCTrack</h1>
+            <Link href="/" className="font-bold text-gray-50 text-sm hover:text-brand-400 transition-colors">
+              MCTrack
+            </Link>
             {networkData?.network && (
               <p className="text-xs text-gray-400 truncate">
                 {networkData.network.name}
               </p>
             )}
           </div>
-        </Link>
+        </div>
       </div>
 
       {/* Navigation */}

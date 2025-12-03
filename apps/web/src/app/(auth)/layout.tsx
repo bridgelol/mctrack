@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { Network, BarChart3, Users, Zap, Shield } from 'lucide-react';
 
 const features = [
@@ -33,12 +34,12 @@ export default function AuthLayout({
       {/* Left Panel - Branding */}
       <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-brand-500 via-brand-500/90 to-brand-600 p-12 flex-col justify-between">
         {/* Logo */}
-        <div className="flex items-center gap-3">
+        <Link href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
           <div className="h-10 w-10 rounded-xl bg-white/10 flex items-center justify-center backdrop-blur-sm">
             <Network className="h-6 w-6 text-white" />
           </div>
           <span className="text-2xl font-bold text-white">MCTrack</span>
-        </div>
+        </Link>
 
         {/* Features */}
         <div className="space-y-8">
@@ -88,12 +89,12 @@ export default function AuthLayout({
       <div className="flex-1 flex flex-col justify-center px-4 sm:px-6 lg:px-20 xl:px-24 bg-gray-950">
         <div className="mx-auto w-full max-w-sm">
           {/* Mobile Logo */}
-          <div className="lg:hidden flex items-center justify-center gap-3 mb-8">
+          <Link href="/" className="lg:hidden flex items-center justify-center gap-3 mb-8 hover:opacity-80 transition-opacity">
             <div className="h-10 w-10 rounded-xl bg-brand-500 flex items-center justify-center">
               <Network className="h-6 w-6 text-white" />
             </div>
             <span className="text-2xl font-bold text-gray-50">MCTrack</span>
-          </div>
+          </Link>
 
           {children}
 
