@@ -1,0 +1,52 @@
+# Velocity Configuration for MCTrack Development
+
+# Velocity server configuration
+config-version = "2.7"
+bind = "0.0.0.0:25577"
+motd = "<aqua>MCTrack Development Proxy"
+show-max-players = 100
+online-mode = false
+force-key-authentication = false
+prevent-client-proxy-connections = false
+player-info-forwarding-mode = "modern"
+
+# Kick existing players when connecting with same username
+kick-existing-players = false
+
+# Ping passthrough
+ping-passthrough = "DISABLED"
+
+# Enable BungeeCord plugin messaging channel support
+enable-player-address-logging = true
+
+# Advanced settings
+[advanced]
+compression-threshold = 256
+compression-level = -1
+login-ratelimit = 3000
+connection-timeout = 5000
+read-timeout = 30000
+haproxy-protocol = false
+tcp-fast-open = false
+bungee-plugin-message-channel = true
+show-ping-requests = false
+failover-on-unexpected-server-disconnect = true
+announce-proxy-commands = true
+log-command-executions = false
+log-player-connections = true
+
+[query]
+enabled = false
+port = 25577
+map = "Velocity"
+show-plugins = false
+
+# Server configuration - Paper server running in same namespace
+[servers]
+lobby = "paper:25565"
+
+# Forced hosts for testing
+[forced-hosts]
+
+# Server priority
+try = ["lobby"]

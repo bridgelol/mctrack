@@ -5,6 +5,11 @@ import { useMutation } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { api } from '@/lib/api';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Select } from '@/components/ui/select';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui';
+import { ArrowLeft, Loader2 } from 'lucide-react';
 
 const TIMEZONES = [
   { value: 'UTC', label: 'UTC' },
@@ -52,89 +57,78 @@ export default function NewNetworkPage() {
   return (
     <div className="max-w-xl mx-auto">
       <div className="mb-6">
-        <Link href="/networks" className="btn btn-ghost btn-sm gap-2">
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-          </svg>
-          Back to Networks
+        <Link href="/networks">
+          <Button variant="ghost" size="sm">
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Networks
+          </Button>
         </Link>
       </div>
 
-      <div className="card bg-base-200">
-        <div className="card-body">
-          <h1 className="card-title text-2xl">Create New Network</h1>
-          <p className="text-base-content/60 mb-4">
+      <Card>
+        <CardHeader>
+          <CardTitle>Create New Network</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-gray-400 mb-6">
             A network represents your Minecraft server or server network. You can track players,
             analytics, and revenue across all servers in a network.
           </p>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             {error && (
-              <div className="alert alert-error">
-                <span>{error}</span>
+              <div className="flex items-center gap-3 p-4 rounded-lg bg-error-500/10 border border-error-500/20">
+                <p className="text-sm text-error-400">{error}</p>
               </div>
             )}
 
-            <div className="form-control">
-              <label className="label">
-                <span className="label-text">Network Name</span>
-              </label>
-              <input
-                type="text"
-                placeholder="e.g., My Minecraft Network"
-                className="input input-bordered"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                maxLength={100}
-                autoFocus
-              />
-              <label className="label">
-                <span className="label-text-alt">This will be displayed throughout the dashboard</span>
-              </label>
-            </div>
+            <Input
+              label="Network Name"
+              type="text"
+              placeholder="e.g., My Minecraft Network"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              maxLength={100}
+              autoFocus
+              hint="This will be displayed throughout the dashboard"
+            />
 
-            <div className="form-control">
-              <label className="label">
-                <span className="label-text">Timezone</span>
-              </label>
-              <select
-                className="select select-bordered"
-                value={timezone}
-                onChange={(e) => setTimezone(e.target.value)}
-              >
-                {TIMEZONES.map((tz) => (
-                  <option key={tz.value} value={tz.value}>
-                    {tz.label}
-                  </option>
-                ))}
-              </select>
-              <label className="label">
-                <span className="label-text-alt">Used for date/time display and daily analytics rollups</span>
-              </label>
-            </div>
+            <Select
+              label="Timezone"
+              value={timezone}
+              onChange={(e) => setTimezone(e.target.value)}
+              hint="Used for date/time display and daily analytics rollups"
+            >
+              {TIMEZONES.map((tz) => (
+                <option key={tz.value} value={tz.value}>
+                  {tz.label}
+                </option>
+              ))}
+            </Select>
 
             <div className="flex justify-end gap-2 pt-4">
-              <Link href="/networks" className="btn btn-ghost">
-                Cancel
+              <Link href="/networks">
+                <Button variant="ghost">
+                  Cancel
+                </Button>
               </Link>
-              <button
+              <Button
                 type="submit"
-                className="btn btn-primary"
                 disabled={createMutation.isPending}
               >
                 {createMutation.isPending ? (
                   <>
-                    <span className="loading loading-spinner loading-sm" />
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                     Creating...
                   </>
                 ) : (
                   'Create Network'
                 )}
-              </button>
+              </Button>
             </div>
           </form>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

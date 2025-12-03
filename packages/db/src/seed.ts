@@ -1,6 +1,15 @@
-import { db, users, networks, networkRoles, networkMembers } from './postgres/index.js';
+import { db, users, networks, networkRoles, networkMembers, apiKeys } from './postgres/index.js';
 import { eq } from 'drizzle-orm';
 import * as bcrypt from 'bcrypt';
+import { createHash } from 'crypto';
+
+// Fixed dev credentials - these are used in plugin configs
+const DEV_API_KEY = 'mct_dev_test_key_12345678';
+const DEV_NETWORK_ID = '00000000-0000-0000-0000-000000000001';
+
+function hashApiKey(key: string): string {
+  return createHash('sha256').update(key).digest('hex');
+}
 
 const DEV_USER = {
   email: 'dev@mctrack.local',
@@ -9,6 +18,7 @@ const DEV_USER = {
 };
 
 const DEV_NETWORK = {
+  id: DEV_NETWORK_ID,
   name: 'Dev Network',
   timezone: 'UTC',
 };
@@ -42,14 +52,15 @@ async function seed() {
 
   // Check if dev network already exists
   const existingNetwork = await db.query.networks.findFirst({
-    where: eq(networks.ownerId, userId),
+    where: eq(networks.id, DEV_NETWORK_ID),
   });
 
   if (existingNetwork) {
     console.log('✓ Dev network already exists');
   } else {
-    // Create dev network
+    // Create dev network with fixed ID
     const [network] = await db.insert(networks).values({
+      id: DEV_NETWORK.id,
       name: DEV_NETWORK.name,
       ownerId: userId,
       timezone: DEV_NETWORK.timezone,
@@ -112,11 +123,24 @@ async function seed() {
     }
 
     console.log('✓ Created dev network:', DEV_NETWORK.name);
+
+    // Create dev API key
+    const keyHash = hashApiKey(DEV_API_KEY);
+    await db.insert(apiKeys).values({
+      networkId: network.id,
+      keyHash,
+      keyPrefix: DEV_API_KEY.substring(0, 12),
+      name: 'Dev API Key',
+    });
+    console.log('✓ Created dev API key');
   }
 
   console.log('\n📋 Dev credentials:');
-  console.log(`   Email:    ${DEV_USER.email}`);
-  console.log(`   Password: ${DEV_USER.password}`);
+  console.log(`   Email:      ${DEV_USER.email}`);
+  console.log(`   Password:   ${DEV_USER.password}`);
+  console.log('\n🔑 Plugin configuration:');
+  console.log(`   API Key:    ${DEV_API_KEY}`);
+  console.log(`   Network ID: ${DEV_NETWORK_ID}`);
   console.log('\n✅ Seeding complete!');
 }
 

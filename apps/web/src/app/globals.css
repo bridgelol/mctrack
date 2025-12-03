@@ -1,6 +1,228 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+
+/* Design tokens - Dark theme inspired by modern SaaS dashboards */
+@theme {
+  /* Colors - Gray scale (dark theme base) */
+  --color-gray-25: #FAFAFA;
+  --color-gray-50: #F5F5F6;
+  --color-gray-100: #F0F1F1;
+  --color-gray-200: #ECECED;
+  --color-gray-300: #CECFD2;
+  --color-gray-400: #94969C;
+  --color-gray-500: #85888E;
+  --color-gray-600: #61646C;
+  --color-gray-700: #333741;
+  --color-gray-800: #1F242F;
+  --color-gray-900: #161B26;
+  --color-gray-950: #0C111D;
+
+  /* Brand colors */
+  --color-brand-25: #F5F3FF;
+  --color-brand-50: #EDE9FE;
+  --color-brand-100: #DDD6FE;
+  --color-brand-200: #C4B5FD;
+  --color-brand-300: #A78BFA;
+  --color-brand-400: #8B5CF6;
+  --color-brand-500: #7C3AED;
+  --color-brand-600: #6D28D9;
+  --color-brand-700: #5B21B6;
+  --color-brand-800: #4C1D95;
+  --color-brand-900: #3B0764;
+
+  /* Success colors */
+  --color-success-25: #F0FDF4;
+  --color-success-50: #DCFCE7;
+  --color-success-100: #BBF7D0;
+  --color-success-200: #86EFAC;
+  --color-success-300: #4ADE80;
+  --color-success-400: #22C55E;
+  --color-success-500: #16A34A;
+  --color-success-600: #15803D;
+  --color-success-700: #166534;
+  --color-success-800: #14532D;
+  --color-success-900: #052E16;
+
+  /* Warning colors */
+  --color-warning-25: #FFFBEB;
+  --color-warning-50: #FEF3C7;
+  --color-warning-100: #FDE68A;
+  --color-warning-200: #FCD34D;
+  --color-warning-300: #FBBF24;
+  --color-warning-400: #F59E0B;
+  --color-warning-500: #D97706;
+  --color-warning-600: #B45309;
+  --color-warning-700: #92400E;
+  --color-warning-800: #78350F;
+  --color-warning-900: #451A03;
+
+  /* Error colors */
+  --color-error-25: #FEF2F2;
+  --color-error-50: #FEE2E2;
+  --color-error-100: #FECACA;
+  --color-error-200: #FCA5A5;
+  --color-error-300: #F87171;
+  --color-error-400: #EF4444;
+  --color-error-500: #DC2626;
+  --color-error-600: #B91C1C;
+  --color-error-700: #991B1B;
+  --color-error-800: #7F1D1D;
+  --color-error-900: #450A0A;
+
+  /* Spacing */
+  --spacing-0: 0px;
+  --spacing-0-5: 2px;
+  --spacing-1: 4px;
+  --spacing-1-5: 6px;
+  --spacing-2: 8px;
+  --spacing-2-5: 10px;
+  --spacing-3: 12px;
+  --spacing-3-5: 14px;
+  --spacing-4: 16px;
+  --spacing-5: 20px;
+  --spacing-6: 24px;
+  --spacing-7: 28px;
+  --spacing-8: 32px;
+  --spacing-9: 36px;
+  --spacing-10: 40px;
+  --spacing-11: 44px;
+  --spacing-12: 48px;
+  --spacing-14: 56px;
+  --spacing-16: 64px;
+  --spacing-20: 80px;
+  --spacing-24: 96px;
+  --spacing-28: 112px;
+  --spacing-32: 128px;
+  --spacing-36: 144px;
+  --spacing-40: 160px;
+  --spacing-44: 176px;
+  --spacing-48: 192px;
+  --spacing-52: 208px;
+  --spacing-56: 224px;
+  --spacing-60: 240px;
+  --spacing-64: 256px;
+  --spacing-72: 288px;
+  --spacing-80: 320px;
+  --spacing-96: 384px;
+
+  /* Border radius */
+  --radius-none: 0px;
+  --radius-xxs: 2px;
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --radius-xl: 12px;
+  --radius-2xl: 16px;
+  --radius-3xl: 20px;
+  --radius-4xl: 24px;
+  --radius-full: 9999px;
+
+  /* Shadows */
+  --shadow-xs: 0px 1px 2px rgba(16, 24, 40, 0.05);
+  --shadow-sm: 0px 1px 2px rgba(16, 24, 40, 0.06), 0px 1px 3px rgba(16, 24, 40, 0.1);
+  --shadow-md: 0px 2px 4px -2px rgba(16, 24, 40, 0.06), 0px 4px 8px -2px rgba(16, 24, 40, 0.1);
+  --shadow-lg: 0px 4px 6px -2px rgba(16, 24, 40, 0.03), 0px 12px 16px -4px rgba(16, 24, 40, 0.08);
+  --shadow-xl: 0px 8px 8px -4px rgba(16, 24, 40, 0.03), 0px 20px 24px -4px rgba(16, 24, 40, 0.08);
+  --shadow-2xl: 0px 24px 48px -12px rgba(16, 24, 40, 0.18);
+  --shadow-3xl: 0px 32px 64px -12px rgba(16, 24, 40, 0.14);
+
+  /* Font sizes */
+  --font-size-xs: 0.75rem;
+  --font-size-sm: 0.875rem;
+  --font-size-md: 1rem;
+  --font-size-lg: 1.125rem;
+  --font-size-xl: 1.25rem;
+  --font-size-display-xs: 1.5rem;
+  --font-size-display-sm: 1.875rem;
+  --font-size-display-md: 2.25rem;
+  --font-size-display-lg: 3rem;
+  --font-size-display-xl: 3.75rem;
+  --font-size-display-2xl: 4.5rem;
+
+  /* Line heights */
+  --line-height-xs: 1.125rem;
+  --line-height-sm: 1.25rem;
+  --line-height-md: 1.5rem;
+  --line-height-lg: 1.75rem;
+  --line-height-xl: 1.875rem;
+  --line-height-display-xs: 2rem;
+  --line-height-display-sm: 2.375rem;
+  --line-height-display-md: 2.75rem;
+  --line-height-display-lg: 3.75rem;
+  --line-height-display-xl: 4.5rem;
+  --line-height-display-2xl: 5.625rem;
+}
+
+/* CSS variables for semantic colors (dark theme) */
+:root {
+  /* Background colors */
+  --bg-primary: var(--color-gray-950);
+  --bg-primary-alt: var(--color-gray-900);
+  --bg-secondary: var(--color-gray-800);
+  --bg-secondary-alt: var(--color-gray-700);
+  --bg-tertiary: var(--color-gray-700);
+  --bg-quaternary: var(--color-gray-600);
+
+  /* Foreground/text colors */
+  --fg-primary: var(--color-gray-50);
+  --fg-secondary: var(--color-gray-300);
+  --fg-tertiary: var(--color-gray-400);
+  --fg-quaternary: var(--color-gray-500);
+  --fg-disabled: var(--color-gray-600);
+  --fg-placeholder: var(--color-gray-500);
+
+  /* Border colors */
+  --border-primary: var(--color-gray-700);
+  --border-secondary: var(--color-gray-800);
+  --border-tertiary: var(--color-gray-900);
+
+  /* Brand semantic colors */
+  --bg-brand-primary: var(--color-brand-500);
+  --bg-brand-secondary: var(--color-brand-600);
+  --fg-brand-primary: var(--color-brand-400);
+  --fg-brand-secondary: var(--color-brand-300);
+  --border-brand: var(--color-brand-500);
+
+  /* Success semantic colors */
+  --bg-success-primary: var(--color-success-500);
+  --bg-success-secondary: var(--color-success-600);
+  --fg-success-primary: var(--color-success-400);
+  --fg-success-secondary: var(--color-success-300);
+
+  /* Warning semantic colors */
+  --bg-warning-primary: var(--color-warning-500);
+  --bg-warning-secondary: var(--color-warning-600);
+  --fg-warning-primary: var(--color-warning-400);
+  --fg-warning-secondary: var(--color-warning-300);
+
+  /* Error semantic colors */
+  --bg-error-primary: var(--color-error-500);
+  --bg-error-secondary: var(--color-error-600);
+  --fg-error-primary: var(--color-error-400);
+  --fg-error-secondary: var(--color-error-300);
+}
+
+/* Base styles */
+@layer base {
+  * {
+    @apply border-gray-700;
+  }
+
+  html {
+    @apply antialiased;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-gray-950 text-gray-50;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+
+  /* Focus styles */
+  :focus-visible {
+    @apply outline-none ring-2 ring-brand-500 ring-offset-2 ring-offset-gray-950;
+  }
+}
 
 /* Custom scrollbar */
 ::-webkit-scrollbar {
@@ -9,16 +231,15 @@
 }
 
 ::-webkit-scrollbar-track {
-  background: hsl(var(--b2));
+  @apply bg-gray-900;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: hsl(var(--b3));
-  border-radius: 4px;
+  @apply bg-gray-700 rounded;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: hsl(var(--bc) / 0.3);
+  @apply bg-gray-600;
 }
 
 /* Chart tooltip styling */
@@ -27,7 +248,56 @@
 }
 
 .recharts-default-tooltip {
-  background-color: hsl(var(--b2)) !important;
-  border: 1px solid hsl(var(--b3)) !important;
-  border-radius: 0.5rem;
+  @apply !bg-gray-800 !border-gray-700 rounded-lg;
+}
+
+/* Utility classes for animations */
+@layer utilities {
+  .animate-in {
+    animation: animate-in 0.2s ease-out;
+  }
+
+  .animate-out {
+    animation: animate-out 0.2s ease-in;
+  }
+
+  @keyframes animate-in {
+    from {
+      opacity: 0;
+      transform: translateY(-4px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes animate-out {
+    from {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    to {
+      opacity: 0;
+      transform: translateY(-4px);
+    }
+  }
+
+  .fade-in {
+    animation: fade-in 0.15s ease-out;
+  }
+
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  /* Skeleton animation */
+  .skeleton {
+    @apply bg-gray-800 animate-pulse rounded;
+  }
 }

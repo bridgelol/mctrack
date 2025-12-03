@@ -1,0 +1,24 @@
+# MCTrack Configuration for Paper Development
+# Get your API key and Network ID from https://mctrack.io
+
+# API Configuration
+api-url: "http://ingestion:4001"
+api-key: "mct_dev_test_key_12345678"
+network-id: "00000000-0000-0000-0000-000000000001"
+
+# Server Configuration
+server-name: "lobby"
+
+# Heartbeat interval in seconds
+heartbeat-interval: 60
+
+# Event batching
+batch-size: 100
+batch-interval: 5
+
+# Privacy Settings
+track-ip-addresses: true
+track-join-domain: true
+
+# Debug mode
+debug: true

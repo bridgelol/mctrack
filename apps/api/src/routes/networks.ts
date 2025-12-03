@@ -277,4 +277,60 @@ router.patch('/:networkId', authenticate, validateBody(updateNetworkSchema), asy
   }
 });
 
+/**
+ * @swagger
+ * /networks/{networkId}:
+ *   delete:
+ *     summary: Delete a network
+ *     tags: [Networks]
+ *     parameters:
+ *       - in: path
+ *         name: networkId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: Network deleted
+ *       403:
+ *         description: Only the owner can delete the network
+ *       404:
+ *         description: Network not found
+ */
+router.delete('/:networkId', authenticate, async (req, res, next) => {
+  try {
+    const { userId } = req as AuthenticatedRequest;
+    const { networkId } = req.params;
+
+    const network = await db.query.networks.findFirst({
+      where: eq(networks.id, networkId),
+    });
+
+    if (!network) {
+      throw new ApiError(404, 'NETWORK_NOT_FOUND', 'Network not found');
+    }
+
+    if (network.ownerId !== userId) {
+      throw new ApiError(403, 'FORBIDDEN', 'Only the owner can delete the network');
+    }
+
+    // Delete network members first (cascade doesn't always work)
+    await db.delete(networkMembers).where(eq(networkMembers.networkId, networkId));
+
+    // Delete network roles
+    await db.delete(networkRoles).where(eq(networkRoles.networkId, networkId));
+
+    // Delete the network
+    await db.delete(networks).where(eq(networks.id, networkId));
+
+    // Invalidate membership cache
+    await membershipService.invalidateCache(userId, networkId);
+
+    res.json({ success: true });
+  } catch (error) {
+    next(error);
+  }
+});
+
 export { router as networksRouter };

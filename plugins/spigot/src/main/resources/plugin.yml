@@ -1,0 +1,18 @@
+name: MCTrack
+version: ${version}
+main: com.mctrack.spigot.MCTrackPlugin
+api-version: "1.20"
+author: MCTrack
+description: Player analytics and session tracking for Minecraft servers
+website: https://mctrack.io
+
+commands:
+  mctrack:
+    description: MCTrack admin commands
+    permission: mctrack.admin
+    usage: /<command> [reload|status]
+
+permissions:
+  mctrack.admin:
+    description: Access to MCTrack admin commands
+    default: op

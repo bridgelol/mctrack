@@ -5,11 +5,18 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'next/navigation';
 import { api } from '@/lib/api';
 
+interface Gamemode {
+  id: string;
+  name: string;
+}
+
 interface ApiKey {
   id: string;
   name: string;
   keyPrefix: string;
   scopes: string[];
+  gamemodeId: string | null;
+  gamemode?: Gamemode | null;
   lastUsedAt: string | null;
   expiresAt: string | null;
   createdAt: string;
@@ -17,6 +24,10 @@ interface ApiKey {
 
 interface ApiKeysResponse {
   keys: ApiKey[];
+}
+
+interface GamemodesResponse {
+  gamemodes: Gamemode[];
 }
 
 interface NewKeyResponse {
@@ -48,8 +59,13 @@ export default function ApiKeysPage() {
     queryFn: () => api.get(`/networks/${networkId}/api-keys`),
   });
 
+  const { data: gamemodesData } = useQuery<GamemodesResponse>({
+    queryKey: ['gamemodes', networkId],
+    queryFn: () => api.get(`/networks/${networkId}/gamemodes`),
+  });
+
   const createMutation = useMutation({
-    mutationFn: (keyData: { name: string; scopes: string[]; expiresAt?: string }) =>
+    mutationFn: (keyData: { name: string; scopes: string[]; expiresAt?: string; gamemodeId?: string }) =>
       api.post<NewKeyResponse>(`/networks/${networkId}/api-keys`, keyData),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['api-keys', networkId] });
@@ -73,8 +89,28 @@ export default function ApiKeysPage() {
 
   if (isLoading) {
     return (
-      <div className="flex justify-center py-12">
-        <span className="loading loading-spinner loading-lg" />
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <div className="space-y-2">
+            <div className="h-7 w-32 bg-base-300/70 rounded-lg animate-pulse" />
+            <div className="h-4 w-64 bg-base-300/70 rounded animate-pulse" />
+          </div>
+          <div className="h-9 w-36 bg-base-300/70 rounded-lg animate-pulse" />
+        </div>
+        <div className="rounded-xl bg-base-200 overflow-hidden">
+          <div className="flex gap-4 p-4 border-b border-base-300 bg-base-300/30">
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <div key={i} className="h-4 flex-1 bg-base-300/70 rounded animate-pulse" />
+            ))}
+          </div>
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="flex gap-4 p-4 border-b border-base-300 last:border-0">
+              {[1, 2, 3, 4, 5, 6].map((j) => (
+                <div key={j} className="h-4 flex-1 bg-base-300/70 rounded animate-pulse" />
+              ))}
+            </div>
+          ))}
+        </div>
       </div>
     );
   }
@@ -127,6 +163,7 @@ export default function ApiKeysPage() {
               <tr>
                 <th>Name</th>
                 <th>Key</th>
+                <th>Gamemode</th>
                 <th>Scopes</th>
                 <th>Last Used</th>
                 <th>Expires</th>
@@ -143,14 +180,26 @@ export default function ApiKeysPage() {
                     </code>
                   </td>
                   <td>
+                    {key.gamemode ? (
+                      <span className="badge badge-sm badge-primary">
+                        {key.gamemode.name}
+                      </span>
+                    ) : (
+                      <span className="text-base-content/50 text-sm">All gamemodes</span>
+                    )}
+                  </td>
+                  <td>
                     <div className="flex flex-wrap gap-1">
-                      {key.scopes.slice(0, 3).map((scope) => (
+                      {(key.scopes || []).slice(0, 3).map((scope) => (
                         <span key={scope} className="badge badge-sm badge-outline">
                           {scope}
                         </span>
                       ))}
-                      {key.scopes.length > 3 && (
-                        <span className="badge badge-sm">+{key.scopes.length - 3}</span>
+                      {(key.scopes?.length || 0) > 3 && (
+                        <span className="badge badge-sm">+{key.scopes!.length - 3}</span>
+                      )}
+                      {!key.scopes?.length && (
+                        <span className="text-base-content/50 text-sm">All permissions</span>
                       )}
                     </div>
                   </td>
@@ -183,6 +232,7 @@ export default function ApiKeysPage() {
           onClose={() => setShowCreateModal(false)}
           onSave={(data) => createMutation.mutate(data)}
           isLoading={createMutation.isPending}
+          gamemodes={gamemodesData?.gamemodes || []}
         />
       )}
     </div>
@@ -191,14 +241,16 @@ export default function ApiKeysPage() {
 
 interface CreateKeyModalProps {
   onClose: () => void;
-  onSave: (data: { name: string; scopes: string[]; expiresAt?: string }) => void;
+  onSave: (data: { name: string; scopes: string[]; expiresAt?: string; gamemodeId?: string }) => void;
   isLoading: boolean;
+  gamemodes: Gamemode[];
 }
 
-function CreateKeyModal({ onClose, onSave, isLoading }: CreateKeyModalProps) {
+function CreateKeyModal({ onClose, onSave, isLoading, gamemodes }: CreateKeyModalProps) {
   const [name, setName] = useState('');
   const [scopes, setScopes] = useState<string[]>([]);
   const [expiresIn, setExpiresIn] = useState<string>('never');
+  const [gamemodeId, setGamemodeId] = useState<string>('');
 
   const toggleScope = (scope: string) => {
     setScopes((prev) =>
@@ -217,7 +269,12 @@ function CreateKeyModal({ onClose, onSave, isLoading }: CreateKeyModalProps) {
       expiresAt = date.toISOString();
     }
 
-    onSave({ name, scopes, expiresAt });
+    onSave({
+      name,
+      scopes,
+      expiresAt,
+      gamemodeId: gamemodeId || undefined,
+    });
   };
 
   return (
@@ -239,6 +296,31 @@ function CreateKeyModal({ onClose, onSave, isLoading }: CreateKeyModalProps) {
               required
             />
           </div>
+
+          {gamemodes.length > 0 && (
+            <div className="form-control">
+              <label className="label">
+                <span className="label-text">Gamemode (optional)</span>
+              </label>
+              <select
+                className="select select-bordered"
+                value={gamemodeId}
+                onChange={(e) => setGamemodeId(e.target.value)}
+              >
+                <option value="">All gamemodes (network-wide)</option>
+                {gamemodes.map((gm) => (
+                  <option key={gm.id} value={gm.id}>
+                    {gm.name}
+                  </option>
+                ))}
+              </select>
+              <label className="label">
+                <span className="label-text-alt text-base-content/60">
+                  Scoping to a gamemode restricts this key to only submit data for that gamemode
+                </span>
+              </label>
+            </div>
+          )}
 
           <div className="form-control">
             <label className="label">

@@ -67,30 +67,67 @@ router.get(
       const { start, end, platform, country } = req.query as z.infer<typeof dateRangeSchema>;
 
       const platformFilter = platform && platform !== 'all' ? `AND platform = '${platform}'` : '';
-      const countryFilter = country && country !== '' ? `AND country = '${country}'` : '';
+      const countryFilter = country && country !== '' ? `AND player_country = '${country}'` : '';
 
-      const [stats] = await query<{
+      // Query real-time data from network_sessions
+      const [sessionStats] = await query<{
         unique_players: number;
         total_sessions: number;
         total_playtime_minutes: number;
-        peak_ccu: number;
+      }>(`
+        SELECT
+          uniq(player_uuid) as unique_players,
+          count() as total_sessions,
+          sum(if(end_time IS NOT NULL, dateDiff('minute', start_time, end_time), 0)) as total_playtime_minutes
+        FROM network_sessions
+        WHERE network_id = '${networkId}'
+          AND toDate(start_time) >= '${start}'
+          AND toDate(start_time) <= '${end}'
+          ${platformFilter}
+          ${countryFilter}
+      `);
+
+      // Get peak CCU for the period
+      const [ccuStats] = await query<{ peak_ccu: number }>(`
+        SELECT max(concurrent) as peak_ccu
+        FROM (
+          SELECT
+            toStartOfMinute(start_time) as minute,
+            uniq(session_uuid) as concurrent
+          FROM network_sessions
+          WHERE network_id = '${networkId}'
+            AND toDate(start_time) >= '${start}'
+            AND toDate(start_time) <= '${end}'
+            ${platformFilter}
+            ${countryFilter}
+          GROUP BY minute
+        )
+      `);
+
+      // Get revenue from payments
+      const [revenueStats] = await query<{
         revenue: number;
         paying_players: number;
       }>(`
         SELECT
-          sum(unique_players) as unique_players,
-          sum(total_sessions) as total_sessions,
-          sum(total_playtime_minutes) as total_playtime_minutes,
-          max(peak_ccu) as peak_ccu,
-          sum(revenue) as revenue,
-          sum(paying_players) as paying_players
-        FROM daily_rollups_segmented
+          sum(amount) as revenue,
+          uniq(player_uuid) as paying_players
+        FROM payments
         WHERE network_id = '${networkId}'
-          AND date >= '${start}'
-          AND date <= '${end}'
+          AND toDate(timestamp) >= '${start}'
+          AND toDate(timestamp) <= '${end}'
           ${platformFilter}
-          ${countryFilter}
+          ${country && country !== '' ? `AND country = '${country}'` : ''}
       `);
+
+      const stats = {
+        unique_players: sessionStats?.unique_players || 0,
+        total_sessions: sessionStats?.total_sessions || 0,
+        total_playtime_minutes: sessionStats?.total_playtime_minutes || 0,
+        peak_ccu: ccuStats?.peak_ccu || 0,
+        revenue: revenueStats?.revenue || 0,
+        paying_players: revenueStats?.paying_players || 0,
+      };
 
       const uniquePlayers = Number(stats?.unique_players || 0);
       const payingPlayers = Number(stats?.paying_players || 0);
@@ -100,7 +137,7 @@ router.get(
         uniquePlayers,
         totalSessions: Number(stats?.total_sessions || 0),
         avgSessionDuration: uniquePlayers > 0
-          ? Number(stats?.total_playtime_minutes || 0) / Number(stats?.total_sessions || 1)
+          ? (Number(stats?.total_playtime_minutes || 0) / Number(stats?.total_sessions || 1)) * 60
           : 0,
         peakCcu: Number(stats?.peak_ccu || 0),
         revenue,
@@ -140,12 +177,13 @@ router.get(
     try {
       const { networkId } = req.params;
 
-      // Get current CCU (active sessions)
+      // Get current CCU (active sessions with recent heartbeat - within 5 minutes)
       const [currentResult] = await query<{ count: number }>(`
         SELECT count() as count
         FROM network_sessions
         WHERE network_id = '${networkId}'
           AND end_time IS NULL
+          AND last_heartbeat >= now() - INTERVAL 5 MINUTE
       `);
 
       // Get CCU time series for last 24 hours
@@ -311,6 +349,259 @@ router.get(
       }));
 
       res.json({ cohorts: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * @swagger
+ * /networks/{networkId}/analytics/timeseries:
+ *   get:
+ *     summary: Get time series data for charts
+ *     tags: [Analytics]
+ */
+router.get(
+  '/timeseries',
+  authenticate,
+  requirePermission(Permission.VIEW_DASHBOARD),
+  validateQuery(dateRangeSchema),
+  async (req, res, next) => {
+    try {
+      const { networkId } = req.params;
+      const { start, end, platform, country } = req.query as z.infer<typeof dateRangeSchema>;
+
+      const platformFilter = platform && platform !== 'all' ? `AND platform = '${platform}'` : '';
+      const countryFilter = country && country !== '' ? `AND player_country = '${country}'` : '';
+
+      // Player activity by day
+      const playerActivity = await query<{
+        date: string;
+        players: number;
+        sessions: number;
+      }>(`
+        SELECT
+          toDate(start_time) as date,
+          uniq(player_uuid) as players,
+          count() as sessions
+        FROM network_sessions
+        WHERE network_id = '${networkId}'
+          AND toDate(start_time) >= '${start}'
+          AND toDate(start_time) <= '${end}'
+          ${platformFilter}
+          ${countryFilter}
+        GROUP BY date
+        ORDER BY date
+      `);
+
+      // Hourly activity pattern (for today or single-day ranges)
+      const hourlyActivity = await query<{
+        hour: number;
+        sessions: number;
+      }>(`
+        SELECT
+          toHour(start_time) as hour,
+          count() as sessions
+        FROM network_sessions
+        WHERE network_id = '${networkId}'
+          AND toDate(start_time) >= '${start}'
+          AND toDate(start_time) <= '${end}'
+          ${platformFilter}
+          ${countryFilter}
+        GROUP BY hour
+        ORDER BY hour
+      `);
+
+      // Platform distribution
+      const platforms = await query<{
+        platform: string;
+        count: number;
+      }>(`
+        SELECT
+          platform,
+          uniq(player_uuid) as count
+        FROM network_sessions
+        WHERE network_id = '${networkId}'
+          AND toDate(start_time) >= '${start}'
+          AND toDate(start_time) <= '${end}'
+          ${countryFilter}
+        GROUP BY platform
+      `);
+
+      // Country distribution (top 10)
+      const countries = await query<{
+        country: string;
+        count: number;
+      }>(`
+        SELECT
+          player_country as country,
+          uniq(player_uuid) as count
+        FROM network_sessions
+        WHERE network_id = '${networkId}'
+          AND toDate(start_time) >= '${start}'
+          AND toDate(start_time) <= '${end}'
+          ${platformFilter}
+        GROUP BY country
+        ORDER BY count DESC
+        LIMIT 10
+      `);
+
+      // Revenue by day
+      const revenue = await query<{
+        date: string;
+        revenue: number;
+        transactions: number;
+      }>(`
+        SELECT
+          toDate(timestamp) as date,
+          sum(amount) as revenue,
+          count() as transactions
+        FROM payments
+        WHERE network_id = '${networkId}'
+          AND toDate(timestamp) >= '${start}'
+          AND toDate(timestamp) <= '${end}'
+          ${platformFilter}
+          ${country && country !== '' ? `AND country = '${country}'` : ''}
+        GROUP BY date
+        ORDER BY date
+      `);
+
+      // CCU timeline (5-minute intervals)
+      const ccuTimeline = await query<{
+        timestamp: string;
+        ccu: number;
+      }>(`
+        SELECT
+          toStartOfFiveMinutes(start_time) as timestamp,
+          uniq(session_uuid) as ccu
+        FROM network_sessions
+        WHERE network_id = '${networkId}'
+          AND toDate(start_time) >= '${start}'
+          AND toDate(start_time) <= '${end}'
+          ${platformFilter}
+          ${countryFilter}
+        GROUP BY timestamp
+        ORDER BY timestamp
+      `);
+
+      res.json({
+        playerActivity: playerActivity.map((d) => ({
+          name: d.date,
+          players: Number(d.players),
+          sessions: Number(d.sessions),
+        })),
+        hourlyActivity: hourlyActivity.map((d) => ({
+          name: `${d.hour}:00`,
+          sessions: Number(d.sessions),
+        })),
+        platforms: platforms.map((d) => ({
+          name: d.platform,
+          value: Number(d.count),
+        })),
+        countries: countries.map((d) => ({
+          name: d.country,
+          value: Number(d.count),
+        })),
+        revenue: revenue.map((d) => ({
+          name: d.date,
+          revenue: Number(d.revenue),
+          transactions: Number(d.transactions),
+        })),
+        ccuTimeline: ccuTimeline.map((d) => ({
+          timestamp: d.timestamp,
+          value: Number(d.ccu),
+        })),
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * @swagger
+ * /networks/{networkId}/analytics/realtime:
+ *   get:
+ *     summary: Get real-time analytics (last 5 minutes)
+ *     tags: [Analytics]
+ */
+router.get(
+  '/realtime',
+  authenticate,
+  requirePermission(Permission.VIEW_DASHBOARD),
+  async (req, res, next) => {
+    try {
+      const { networkId } = req.params;
+
+      // Current CCU (active sessions with recent heartbeat)
+      const [currentCcu] = await query<{ count: number }>(`
+        SELECT count() as count
+        FROM network_sessions
+        WHERE network_id = '${networkId}'
+          AND end_time IS NULL
+          AND last_heartbeat >= now() - INTERVAL 5 MINUTE
+      `);
+
+      // Sessions in last 5 minutes
+      const [recentActivity] = await query<{
+        new_sessions: number;
+        ended_sessions: number;
+        unique_players: number;
+      }>(`
+        SELECT
+          countIf(start_time >= now() - INTERVAL 5 MINUTE) as new_sessions,
+          countIf(end_time >= now() - INTERVAL 5 MINUTE) as ended_sessions,
+          uniqIf(player_uuid, start_time >= now() - INTERVAL 5 MINUTE) as unique_players
+        FROM network_sessions
+        WHERE network_id = '${networkId}'
+          AND (start_time >= now() - INTERVAL 5 MINUTE OR end_time >= now() - INTERVAL 5 MINUTE)
+      `);
+
+      // CCU trend (last hour, per minute)
+      const ccuTrend = await query<{
+        minute: string;
+        ccu: number;
+      }>(`
+        SELECT
+          toStartOfMinute(start_time) as minute,
+          uniq(session_uuid) as ccu
+        FROM network_sessions
+        WHERE network_id = '${networkId}'
+          AND start_time >= now() - INTERVAL 1 HOUR
+        GROUP BY minute
+        ORDER BY minute
+      `);
+
+      // Platform breakdown of current players
+      const platformBreakdown = await query<{
+        platform: string;
+        count: number;
+      }>(`
+        SELECT
+          platform,
+          count() as count
+        FROM network_sessions
+        WHERE network_id = '${networkId}'
+          AND end_time IS NULL
+          AND last_heartbeat >= now() - INTERVAL 5 MINUTE
+        GROUP BY platform
+      `);
+
+      res.json({
+        currentCcu: Number(currentCcu?.count || 0),
+        newSessions: Number(recentActivity?.new_sessions || 0),
+        endedSessions: Number(recentActivity?.ended_sessions || 0),
+        uniquePlayersLast5Min: Number(recentActivity?.unique_players || 0),
+        ccuTrend: ccuTrend.map((d) => ({
+          timestamp: d.minute,
+          value: Number(d.ccu),
+        })),
+        platformBreakdown: platformBreakdown.map((d) => ({
+          platform: d.platform,
+          count: Number(d.count),
+        })),
+      });
     } catch (error) {
       next(error);
     }

@@ -22,6 +22,15 @@ export interface NetworkSession {
   bedrock_device: string | null;
   start_time: Date;
   end_time: Date | null;
+  last_heartbeat: Date;
+}
+
+export interface CcuSnapshot {
+  network_id: string;
+  timestamp: Date;
+  ccu: number;
+  java_ccu: number;
+  bedrock_ccu: number;
 }
 
 // ============================================================================
@@ -150,12 +159,25 @@ CREATE TABLE IF NOT EXISTS network_sessions (
   ip_address String,
   player_country LowCardinality(String),
   platform Enum8('java' = 1, 'bedrock' = 2),
-  bedrock_device Nullable(LowCardinality(String)),
+  bedrock_device LowCardinality(Nullable(String)),
   start_time DateTime64(3),
-  end_time Nullable(DateTime64(3))
+  end_time Nullable(DateTime64(3)),
+  last_heartbeat DateTime64(3) DEFAULT start_time
 ) ENGINE = MergeTree()
 PARTITION BY toYYYYMM(start_time)
 ORDER BY (network_id, start_time, session_uuid);
+
+-- CCU Snapshots (recorded every minute)
+CREATE TABLE IF NOT EXISTS ccu_snapshots (
+  network_id UUID,
+  timestamp DateTime,
+  ccu UInt32,
+  java_ccu UInt32,
+  bedrock_ccu UInt32
+) ENGINE = MergeTree()
+PARTITION BY toYYYYMM(timestamp)
+ORDER BY (network_id, timestamp)
+TTL timestamp + INTERVAL 90 DAY;
 
 -- GameMode Sessions
 CREATE TABLE IF NOT EXISTS gamemode_sessions (
@@ -179,7 +201,7 @@ CREATE TABLE IF NOT EXISTS payments (
   player_name String,
   player_uuid Nullable(String),
   platform Enum8('java' = 1, 'bedrock' = 2),
-  bedrock_device Nullable(LowCardinality(String)),
+  bedrock_device LowCardinality(Nullable(String)),
   country LowCardinality(String),
   amount Decimal(10, 2),
   currency LowCardinality(String),

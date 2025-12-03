@@ -1,0 +1,36 @@
+# Velocity Proxy with MCTrack plugin
+FROM eclipse-temurin:21-jre-alpine
+
+# Install curl for healthcheck
+RUN apk add --no-cache curl
+
+WORKDIR /server
+
+# Download Velocity (latest build from PaperMC API)
+ARG VELOCITY_VERSION=3.4.0-SNAPSHOT
+ARG VELOCITY_BUILD=557
+RUN curl -L -o velocity.jar \
+    "https://api.papermc.io/v2/projects/velocity/versions/${VELOCITY_VERSION}/builds/${VELOCITY_BUILD}/downloads/velocity-${VELOCITY_VERSION}-${VELOCITY_BUILD}.jar"
+
+# Create directories
+RUN mkdir -p plugins/mctrack
+
+# Copy the MCTrack plugin
+COPY velocity/build/libs/velocity-1.0.0.jar plugins/mctrack-velocity.jar
+
+# Copy MCTrack plugin configuration
+COPY docker/velocity/plugins/mctrack/config.yml plugins/mctrack/config.yml
+
+# Copy Velocity configuration files
+COPY docker/velocity/velocity.toml velocity.toml
+COPY docker/velocity/forwarding.secret forwarding.secret
+
+# Expose Velocity port
+EXPOSE 25577
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:8081/health || exit 1
+
+# Run Velocity
+CMD ["java", "-Xms512M", "-Xmx512M", "-jar", "velocity.jar"]

@@ -1,13 +1,55 @@
 'use client';
 
-import { Suspense, useState } from 'react';
+import { Suspense, useState, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { User, Mail, Lock, AlertCircle, Check } from 'lucide-react';
+import { cn } from '@/lib/utils';
+
+function PasswordStrength({ password }: { password: string }) {
+  const strength = useMemo(() => {
+    let score = 0;
+    if (password.length >= 8) score++;
+    if (password.length >= 12) score++;
+    if (/[a-z]/.test(password) && /[A-Z]/.test(password)) score++;
+    if (/\d/.test(password)) score++;
+    if (/[^a-zA-Z0-9]/.test(password)) score++;
+    return score;
+  }, [password]);
+
+  const label = ['Very Weak', 'Weak', 'Fair', 'Good', 'Strong'][strength] || 'Very Weak';
+  const color = ['bg-error-400', 'bg-error-400', 'bg-warning-400', 'bg-success-400', 'bg-success-400'][strength] || 'bg-gray-800';
+
+  if (!password) return null;
+
+  return (
+    <div className="mt-2 space-y-1">
+      <div className="flex gap-1">
+        {[0, 1, 2, 3, 4].map((i) => (
+          <div
+            key={i}
+            className={cn(
+              'h-1 flex-1 rounded-full transition-colors',
+              i < strength ? color : 'bg-gray-800'
+            )}
+          />
+        ))}
+      </div>
+      <p className={cn(
+        'text-xs',
+        strength <= 1 ? 'text-error-400' : strength <= 2 ? 'text-warning-400' : 'text-success-400'
+      )}>
+        Password strength: {label}
+      </p>
+    </div>
+  );
+}
 
 function RegisterForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const callbackUrl = searchParams.get('callbackUrl') || '/networks';
 
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
@@ -16,12 +58,15 @@ function RegisterForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  const passwordsMatch = password === confirmPassword;
+  const isValid = username.length >= 3 && email && password.length >= 8 && passwordsMatch;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError('');
 
-    if (password !== confirmPassword) {
+    if (!passwordsMatch) {
       setError('Passwords do not match');
       setLoading(false);
       return;
@@ -48,7 +93,6 @@ function RegisterForm() {
         return;
       }
 
-      // Redirect to login with success message
       router.push('/login?registered=true');
     } catch {
       setError('Something went wrong. Please try again.');
@@ -57,96 +101,98 @@ function RegisterForm() {
   };
 
   return (
-    <div className="card bg-base-200 shadow-xl">
-      <div className="card-body">
-        <h2 className="card-title justify-center mb-4">Create Account</h2>
-
-        {error && (
-          <div className="alert alert-error mb-4">
-            <span>{error}</span>
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="form-control">
-            <label className="label">
-              <span className="label-text">Username</span>
-            </label>
-            <input
-              type="text"
-              placeholder="yourname"
-              className="input input-bordered"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              required
-              minLength={3}
-              maxLength={32}
-            />
-          </div>
-
-          <div className="form-control">
-            <label className="label">
-              <span className="label-text">Email</span>
-            </label>
-            <input
-              type="email"
-              placeholder="you@example.com"
-              className="input input-bordered"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
-          </div>
-
-          <div className="form-control">
-            <label className="label">
-              <span className="label-text">Password</span>
-            </label>
-            <input
-              type="password"
-              placeholder="••••••••"
-              className="input input-bordered"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              minLength={8}
-            />
-          </div>
-
-          <div className="form-control">
-            <label className="label">
-              <span className="label-text">Confirm Password</span>
-            </label>
-            <input
-              type="password"
-              placeholder="••••••••"
-              className="input input-bordered"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              required
-            />
-          </div>
-
-          <button
-            type="submit"
-            className="btn btn-primary w-full"
-            disabled={loading}
-          >
-            {loading ? (
-              <span className="loading loading-spinner loading-sm" />
-            ) : (
-              'Create Account'
-            )}
-          </button>
-        </form>
-
-        <p className="text-center mt-4 text-sm text-base-content/60">
-          Already have an account?{' '}
-          <Link href="/login" className="link link-primary">
-            Sign in
-          </Link>
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="text-center lg:text-left">
+        <h1 className="text-2xl font-bold text-gray-50">Create an account</h1>
+        <p className="text-gray-400 mt-1">
+          Start tracking your Minecraft server analytics
         </p>
       </div>
+
+      {/* Error Message */}
+      {error && (
+        <div className="flex items-center gap-3 p-4 rounded-lg bg-error-500/10 border border-error-500/20">
+          <AlertCircle className="h-5 w-5 text-error-400 flex-shrink-0" />
+          <p className="text-sm text-error-400">{error}</p>
+        </div>
+      )}
+
+      {/* Form */}
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <Input
+          label="Username"
+          type="text"
+          placeholder="yourname"
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
+          required
+          disabled={loading}
+          leftIcon={<User className="h-4 w-4" />}
+          hint="3-32 characters"
+        />
+
+        <Input
+          label="Email"
+          type="email"
+          placeholder="you@example.com"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
+          disabled={loading}
+          leftIcon={<Mail className="h-4 w-4" />}
+        />
+
+        <div>
+          <Input
+            label="Password"
+            type="password"
+            placeholder="Create a strong password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            disabled={loading}
+            leftIcon={<Lock className="h-4 w-4" />}
+          />
+          <PasswordStrength password={password} />
+        </div>
+
+        <div>
+          <Input
+            label="Confirm Password"
+            type="password"
+            placeholder="Confirm your password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            required
+            disabled={loading}
+            leftIcon={<Lock className="h-4 w-4" />}
+            error={confirmPassword && !passwordsMatch ? 'Passwords do not match' : undefined}
+            rightIcon={
+              confirmPassword && passwordsMatch ? (
+                <Check className="h-4 w-4 text-success-400" />
+              ) : undefined
+            }
+          />
+        </div>
+
+        <Button
+          type="submit"
+          className="w-full"
+          isLoading={loading}
+          disabled={!isValid}
+        >
+          Create Account
+        </Button>
+      </form>
+
+      {/* Login Link */}
+      <p className="text-center text-sm text-gray-400">
+        Already have an account?{' '}
+        <Link href="/login" className="text-brand-400 font-medium hover:underline">
+          Sign in
+        </Link>
+      </p>
     </div>
   );
 }
@@ -154,10 +200,8 @@ function RegisterForm() {
 export default function RegisterPage() {
   return (
     <Suspense fallback={
-      <div className="card bg-base-200 shadow-xl">
-        <div className="card-body flex items-center justify-center">
-          <span className="loading loading-spinner loading-lg" />
-        </div>
+      <div className="flex items-center justify-center py-12">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-brand-500 border-t-transparent" />
       </div>
     }>
       <RegisterForm />

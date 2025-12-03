@@ -1,0 +1,5 @@
+name: MCTrack
+version: ${version}
+main: com.mctrack.bungee.MCTrackBungee
+author: MCTrack
+description: Player analytics and session tracking for Minecraft networks

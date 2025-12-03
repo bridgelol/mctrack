@@ -1,14 +1,22 @@
 import { insert } from '@mctrack/db/clickhouse';
-import { NetworkSession } from '@mctrack/db/clickhouse';
+import { NetworkSession, GameModeSession } from '@mctrack/db/clickhouse';
 import { logger } from '../lib/logger.js';
+
+// Convert Date to ClickHouse DateTime64 format: "2025-12-03 00:49:40.000"
+function formatDateForClickHouse(date: Date | null): string | null {
+  if (!date) return null;
+  return date.toISOString().replace('T', ' ').replace('Z', '');
+}
 
 interface SessionBuffer {
   sessions: NetworkSession[];
+  gamemodeSessions: GameModeSession[];
   lastFlush: number;
 }
 
 const buffer: SessionBuffer = {
   sessions: [],
+  gamemodeSessions: [],
   lastFlush: Date.now(),
 };
 
@@ -18,7 +26,7 @@ const MAX_BUFFER_SIZE = 1000; // Or when buffer reaches 1000 items
 let flushInterval: NodeJS.Timeout | null = null;
 
 /**
- * Add a session to the buffer
+ * Add a network session to the buffer
  */
 export function addSession(session: NetworkSession): void {
   buffer.sessions.push(session);
@@ -32,22 +40,67 @@ export function addSession(session: NetworkSession): void {
 }
 
 /**
+ * Add a gamemode session to the buffer
+ */
+export function addGamemodeSession(session: GameModeSession): void {
+  buffer.gamemodeSessions.push(session);
+
+  // Flush if buffer is full
+  if (buffer.gamemodeSessions.length >= MAX_BUFFER_SIZE) {
+    flushBuffer().catch((err) => {
+      logger.error({ err }, 'Failed to flush buffer');
+    });
+  }
+}
+
+/**
  * Flush the buffer to ClickHouse
  */
 export async function flushBuffer(): Promise<void> {
-  if (buffer.sessions.length === 0) return;
+  const hasNetworkSessions = buffer.sessions.length > 0;
+  const hasGamemodeSessions = buffer.gamemodeSessions.length > 0;
 
-  const sessionsToFlush = [...buffer.sessions];
-  buffer.sessions = [];
+  if (!hasNetworkSessions && !hasGamemodeSessions) return;
+
   buffer.lastFlush = Date.now();
 
-  try {
-    await insert('network_sessions', sessionsToFlush as any[]);
-    logger.debug({ count: sessionsToFlush.length }, 'Flushed sessions to ClickHouse');
-  } catch (error) {
-    logger.error({ error, count: sessionsToFlush.length }, 'Failed to flush sessions');
-    // Re-add failed sessions to buffer for retry
-    buffer.sessions.unshift(...sessionsToFlush);
+  // Flush network sessions
+  if (hasNetworkSessions) {
+    const sessionsToFlush = [...buffer.sessions];
+    buffer.sessions = [];
+
+    try {
+      const formattedSessions = sessionsToFlush.map(session => ({
+        ...session,
+        start_time: formatDateForClickHouse(session.start_time),
+        end_time: formatDateForClickHouse(session.end_time),
+        last_heartbeat: formatDateForClickHouse(session.last_heartbeat || session.start_time),
+      }));
+      await insert('network_sessions', formattedSessions as any[]);
+      logger.debug({ count: sessionsToFlush.length }, 'Flushed network sessions to ClickHouse');
+    } catch (error) {
+      logger.error({ error, count: sessionsToFlush.length }, 'Failed to flush network sessions');
+      buffer.sessions.unshift(...sessionsToFlush);
+    }
+  }
+
+  // Flush gamemode sessions
+  if (hasGamemodeSessions) {
+    const gamemodeSessionsToFlush = [...buffer.gamemodeSessions];
+    buffer.gamemodeSessions = [];
+
+    try {
+      const formattedSessions = gamemodeSessionsToFlush.map(session => ({
+        ...session,
+        start_time: formatDateForClickHouse(session.start_time),
+        end_time: formatDateForClickHouse(session.end_time),
+      }));
+      await insert('gamemode_sessions', formattedSessions as any[]);
+      logger.debug({ count: gamemodeSessionsToFlush.length }, 'Flushed gamemode sessions to ClickHouse');
+    } catch (error) {
+      logger.error({ error, count: gamemodeSessionsToFlush.length }, 'Failed to flush gamemode sessions');
+      buffer.gamemodeSessions.unshift(...gamemodeSessionsToFlush);
+    }
   }
 }
 
@@ -83,9 +136,10 @@ export async function stopBufferFlush(): Promise<void> {
 /**
  * Get buffer stats for monitoring
  */
-export function getBufferStats(): { size: number; lastFlush: number } {
+export function getBufferStats(): { networkSessions: number; gamemodeSessions: number; lastFlush: number } {
   return {
-    size: buffer.sessions.length,
+    networkSessions: buffer.sessions.length,
+    gamemodeSessions: buffer.gamemodeSessions.length,
     lastFlush: buffer.lastFlush,
   };
 }

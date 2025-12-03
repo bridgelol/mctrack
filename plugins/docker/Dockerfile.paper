@@ -1,0 +1,42 @@
+# PaperMC 1.21.10 with MCTrack plugin
+FROM eclipse-temurin:21-jre-alpine
+
+# Install curl for healthcheck
+RUN apk add --no-cache curl
+
+WORKDIR /server
+
+# Download PaperMC 1.21.10 (latest build from PaperMC API)
+ARG PAPER_VERSION=1.21.10
+ARG PAPER_BUILD=117
+RUN curl -L -o paper.jar \
+    "https://api.papermc.io/v2/projects/paper/versions/${PAPER_VERSION}/builds/${PAPER_BUILD}/downloads/paper-${PAPER_VERSION}-${PAPER_BUILD}.jar"
+
+# Install netcat for healthcheck
+RUN apk add --no-cache netcat-openbsd
+
+# Create directories
+RUN mkdir -p plugins/MCTrack config
+
+# Accept EULA
+RUN echo "eula=true" > eula.txt
+
+# Copy the MCTrack plugin
+COPY spigot/build/libs/spigot-1.0.0.jar plugins/MCTrack.jar
+
+# Copy MCTrack plugin configuration
+COPY docker/paper/plugins/mctrack/config.yml plugins/MCTrack/config.yml
+
+# Copy Paper configuration files
+COPY docker/paper/server.properties server.properties
+COPY docker/paper/config/paper-global.yml config/paper-global.yml
+
+# Expose Minecraft port
+EXPOSE 25565
+
+# Health check using server list ping
+HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=3 \
+    CMD nc -z localhost 25565 || exit 1
+
+# Run Paper (increase memory for dev)
+CMD ["java", "-Xms1G", "-Xmx1G", "-jar", "paper.jar", "--nogui"]

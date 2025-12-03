@@ -107,15 +107,17 @@ router.post(
         .returning({
           id: apiKeys.id,
           name: apiKeys.name,
+          keyPrefix: apiKeys.keyPrefix,
         });
 
       // Return full key only on creation
       res.status(201).json({
-        apiKey: {
+        key: {
           id: apiKey.id,
           name: apiKey.name,
-          key, // Full key - only shown once!
+          keyPrefix: apiKey.keyPrefix,
         },
+        secret: key, // Full key - only shown once!
       });
     } catch (error) {
       next(error);

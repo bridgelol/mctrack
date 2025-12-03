@@ -8,13 +8,18 @@
     "clean": "pnpm -r run clean && rm -rf node_modules",
     "db:generate": "pnpm --filter @mctrack/db run generate",
     "db:migrate": "pnpm --filter @mctrack/db run migrate",
-    "db:push": "pnpm --filter @mctrack/db run push"
+    "db:migrate:ch": "pnpm --filter @mctrack/db run migrate:ch",
+    "db:migrate:all": "pnpm --filter @mctrack/db run migrate:all",
+    "db:push": "pnpm --filter @mctrack/db run push",
+    "db:seed": "pnpm --filter @mctrack/db run seed",
+    "db:studio": "pnpm --filter @mctrack/db run studio",
+    "db:setup": "pnpm --filter @mctrack/db run setup"
   },
   "devDependencies": {
     "@types/node": "^24.10.1",
     "typescript": "^5.9.3"
   },
-  "packageManager": "pnpm@9.0.0",
+  "packageManager": "pnpm@10.24.0",
   "engines": {
     "node": ">=20.0.0"
   }

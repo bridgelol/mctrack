@@ -23,9 +23,12 @@
     "clean": "rm -rf dist",
     "generate": "drizzle-kit generate",
     "migrate": "drizzle-kit migrate",
+    "migrate:ch": "tsx src/clickhouse-migrate.ts",
+    "migrate:all": "pnpm run migrate && pnpm run migrate:ch",
     "push": "drizzle-kit push",
     "studio": "drizzle-kit studio",
-    "seed": "tsx src/seed.ts"
+    "seed": "tsx src/seed.ts",
+    "setup": "pnpm run migrate:all && pnpm run seed"
   },
   "dependencies": {
     "@clickhouse/client": "^1.14.0",

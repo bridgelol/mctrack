@@ -35,3 +35,14 @@ logs/
 # Lock files can be committed but not in draft
 # pnpm-lock.yaml
 *.iml
+
+# TypeScript build info
+*.tsbuildinfo
+
+# Java/Gradle
+.gradle/
+**/build/
+!**/src/**/build/
+*.class
+*.jar
+!plugins/docker/**/*.jar
