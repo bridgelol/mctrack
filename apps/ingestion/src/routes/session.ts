@@ -1,8 +1,8 @@
 import { Router, type IRouter } from 'express';
 import { z } from 'zod';
 import { randomUUID } from 'crypto';
-import { eq, and } from 'drizzle-orm';
-import { db, players } from '@mctrack/db';
+import { eq, and, isNull, lte, gte } from 'drizzle-orm';
+import { db, players, campaigns } from '@mctrack/db';
 import { query, insert } from '@mctrack/db/clickhouse';
 import { Platform, BedrockDevice } from '@mctrack/shared';
 import { apiKeyAuth, AuthenticatedRequest } from '../middleware/api-key-auth.js';
@@ -528,6 +528,9 @@ async function upsertPlayer(
         eq(players.playerUuid, playerUuid)
       ));
   } else {
+    // New player - check for matching campaign
+    const campaignId = await findMatchingCampaign(networkId, data.domain);
+
     // Insert new player
     await db.insert(players).values({
       networkId,
@@ -536,10 +539,73 @@ async function upsertPlayer(
       platform: data.platform,
       bedrockDevice: data.bedrockDevice || null,
       country,
+      campaignId,
       firstSeen: new Date(),
       lastSeen: new Date(),
     });
   }
+}
+
+/**
+ * Find an active campaign that matches the player's join domain
+ */
+async function findMatchingCampaign(
+  networkId: string,
+  domain: string
+): Promise<string | null> {
+  if (!domain) return null;
+
+  const now = new Date();
+
+  // Find active campaigns for this network where domain matches
+  const activeCampaigns = await db.query.campaigns.findMany({
+    where: and(
+      eq(campaigns.networkId, networkId),
+      isNull(campaigns.archivedAt),
+      lte(campaigns.startTime, now),
+      gte(campaigns.endTime, now)
+    ),
+    columns: {
+      id: true,
+      domainFilter: true,
+    },
+  });
+
+  // Check if any campaign's domain filter matches
+  for (const campaign of activeCampaigns) {
+    if (domainMatches(domain, campaign.domainFilter)) {
+      return campaign.id;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Check if a domain matches a filter pattern
+ * Supports exact match and wildcard prefix (*.example.com)
+ */
+function domainMatches(domain: string, filter: string): boolean {
+  const normalizedDomain = domain.toLowerCase();
+  const normalizedFilter = filter.toLowerCase();
+
+  // Exact match
+  if (normalizedDomain === normalizedFilter) {
+    return true;
+  }
+
+  // Wildcard match (*.example.com matches sub.example.com)
+  if (normalizedFilter.startsWith('*.')) {
+    const suffix = normalizedFilter.slice(1); // .example.com
+    return normalizedDomain.endsWith(suffix);
+  }
+
+  // Subdomain match (example.com matches sub.example.com)
+  if (normalizedDomain.endsWith('.' + normalizedFilter)) {
+    return true;
+  }
+
+  return false;
 }
 
 export { router as sessionRouter };
