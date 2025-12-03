@@ -72,3 +72,15 @@ export function truncate(text: string, length: number): string {
   if (text.length <= length) return text;
   return text.slice(0, length) + '...';
 }
+
+/**
+ * Format a date to a readable string
+ */
+export function formatDate(date: Date | string): string {
+  const target = typeof date === 'string' ? new Date(date) : date;
+  return target.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+}
