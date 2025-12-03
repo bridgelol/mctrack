@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { eq, and, isNull } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { db, apiKeys } from '@mctrack/db';
 import { hashApiKey } from '@mctrack/shared';
 import { redis } from '../lib/redis.js';
@@ -40,6 +40,9 @@ export async function apiKeyAuth(
 
     if (cached) {
       const data = JSON.parse(cached);
+      if (data.notFound) {
+        throw new ApiError(401, 'INVALID_API_KEY', 'Invalid API key');
+      }
       if (data.revoked) {
         throw new ApiError(401, 'API_KEY_REVOKED', 'API key has been revoked');
       }
@@ -49,12 +52,9 @@ export async function apiKeyAuth(
       return next();
     }
 
-    // Look up in database
+    // Look up in database - first check if key exists at all
     const key = await db.query.apiKeys.findFirst({
-      where: and(
-        eq(apiKeys.keyHash, keyHash),
-        isNull(apiKeys.revokedAt)
-      ),
+      where: eq(apiKeys.keyHash, keyHash),
       columns: {
         id: true,
         networkId: true,
@@ -64,9 +64,15 @@ export async function apiKeyAuth(
     });
 
     if (!key) {
-      // Cache negative result briefly
-      await redis.setex(cacheKey, 60, JSON.stringify({ revoked: true }));
+      // Key doesn't exist at all - cache as not found
+      await redis.setex(cacheKey, 60, JSON.stringify({ notFound: true }));
       throw new ApiError(401, 'INVALID_API_KEY', 'Invalid API key');
+    }
+
+    if (key.revokedAt) {
+      // Key exists but is revoked - cache as revoked
+      await redis.setex(cacheKey, 60, JSON.stringify({ revoked: true }));
+      throw new ApiError(401, 'API_KEY_REVOKED', 'API key has been revoked');
     }
 
     // Cache the result

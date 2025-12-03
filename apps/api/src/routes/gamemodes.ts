@@ -1,7 +1,7 @@
 import { Router, type IRouter } from 'express';
 import { z } from 'zod';
-import { eq, and } from 'drizzle-orm';
-import { db, gamemodes } from '@mctrack/db';
+import { eq, and, sql, isNull } from 'drizzle-orm';
+import { db, gamemodes, apiKeys } from '@mctrack/db';
 import { query } from '@mctrack/db/clickhouse';
 import { Permission } from '@mctrack/shared';
 import { authenticate } from '../middleware/auth.js';
@@ -29,9 +29,24 @@ router.get(
       const gamemodeList = await db.query.gamemodes.findMany({
         where: eq(gamemodes.networkId, networkId),
         orderBy: (g, { asc }) => [asc(g.name)],
+        with: {
+          apiKeys: {
+            columns: { id: true },
+            where: isNull(apiKeys.revokedAt),
+          },
+        },
       });
 
-      res.json({ gamemodes: gamemodeList });
+      // Transform to include _count
+      const result = gamemodeList.map(gamemode => ({
+        ...gamemode,
+        _count: {
+          apiKeys: gamemode.apiKeys?.length || 0,
+        },
+        apiKeys: undefined, // Remove the raw apiKeys array
+      }));
+
+      res.json({ gamemodes: result });
     } catch (error) {
       next(error);
     }
