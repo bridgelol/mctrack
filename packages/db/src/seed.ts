@@ -1,11 +1,28 @@
-import { db, users, networks, networkRoles, networkMembers, apiKeys } from './postgres/index.js';
+import { db, users, networks, networkRoles, networkMembers, apiKeys, gamemodes } from './postgres/index.js';
 import { eq } from 'drizzle-orm';
 import * as bcrypt from 'bcrypt';
 import { createHash } from 'crypto';
 
 // Fixed dev credentials - these are used in plugin configs
-const DEV_API_KEY = 'mct_dev_test_key_12345678';
 const DEV_NETWORK_ID = '00000000-0000-0000-0000-000000000001';
+
+// Gamemode IDs (fixed for consistency)
+const DEV_GAMEMODE_IDS = {
+  survival: '00000000-0000-0000-0000-000000000011',
+  skyblock: '00000000-0000-0000-0000-000000000012',
+  prison: '00000000-0000-0000-0000-000000000013',
+};
+
+// API Keys for each server (proxy + gamemodes)
+// In a real setup:
+// - Proxy (BungeeCord/Velocity) uses the network-level key to track joins/leaves
+// - Each Paper server uses a gamemode-specific key to track gamemode activity
+const DEV_API_KEYS = {
+  proxy: 'mct_dev_proxy_key_12345678',      // For BungeeCord/Velocity proxy
+  survival: 'mct_dev_survival_key_12345',   // For Survival Paper server
+  skyblock: 'mct_dev_skyblock_key_12345',   // For SkyBlock Paper server
+  prison: 'mct_dev_prison_key_1234567',     // For Prison Paper server
+};
 
 function hashApiKey(key: string): string {
   return createHash('sha256').update(key).digest('hex');
@@ -22,6 +39,13 @@ const DEV_NETWORK = {
   name: 'Dev Network',
   timezone: 'UTC',
 };
+
+// Gamemode definitions for a typical multi-server setup
+const DEV_GAMEMODES = [
+  { id: DEV_GAMEMODE_IDS.survival, name: 'Survival' },
+  { id: DEV_GAMEMODE_IDS.skyblock, name: 'SkyBlock' },
+  { id: DEV_GAMEMODE_IDS.prison, name: 'Prison' },
+];
 
 async function seed() {
   console.log('🌱 Seeding database...');
@@ -124,24 +148,82 @@ async function seed() {
 
     console.log('✓ Created dev network:', DEV_NETWORK.name);
 
-    // Create dev API key
-    const keyHash = hashApiKey(DEV_API_KEY);
+    // Create gamemodes
+    for (const gamemode of DEV_GAMEMODES) {
+      await db.insert(gamemodes).values({
+        id: gamemode.id,
+        networkId: network.id,
+        name: gamemode.name,
+      });
+    }
+    console.log(`✓ Created ${DEV_GAMEMODES.length} gamemodes: ${DEV_GAMEMODES.map(g => g.name).join(', ')}`);
+
+    // Create proxy API key (network-level, no gamemode)
+    const proxyKeyHash = hashApiKey(DEV_API_KEYS.proxy);
     await db.insert(apiKeys).values({
       networkId: network.id,
-      keyHash,
-      keyPrefix: DEV_API_KEY.substring(0, 12),
-      name: 'Dev API Key',
+      keyHash: proxyKeyHash,
+      keyPrefix: DEV_API_KEYS.proxy.substring(0, 12),
+      name: 'Proxy Server',
     });
-    console.log('✓ Created dev API key');
+
+    // Create gamemode-specific API keys
+    const gamemodeKeyMap: { key: keyof typeof DEV_API_KEYS; gamemodeId: string; name: string }[] = [
+      { key: 'survival', gamemodeId: DEV_GAMEMODE_IDS.survival, name: 'Survival Server' },
+      { key: 'skyblock', gamemodeId: DEV_GAMEMODE_IDS.skyblock, name: 'SkyBlock Server' },
+      { key: 'prison', gamemodeId: DEV_GAMEMODE_IDS.prison, name: 'Prison Server' },
+    ];
+
+    for (const { key, gamemodeId, name } of gamemodeKeyMap) {
+      const keyHash = hashApiKey(DEV_API_KEYS[key]);
+      await db.insert(apiKeys).values({
+        networkId: network.id,
+        gamemodeId,
+        keyHash,
+        keyPrefix: DEV_API_KEYS[key].substring(0, 12),
+        name,
+      });
+    }
+    console.log('✓ Created API keys for proxy + gamemodes');
   }
 
-  console.log('\n📋 Dev credentials:');
+  console.log('\n' + '='.repeat(60));
+  console.log('📋 DEV CREDENTIALS');
+  console.log('='.repeat(60));
   console.log(`   Email:      ${DEV_USER.email}`);
   console.log(`   Password:   ${DEV_USER.password}`);
-  console.log('\n🔑 Plugin configuration:');
-  console.log(`   API Key:    ${DEV_API_KEY}`);
+
+  console.log('\n' + '='.repeat(60));
+  console.log('🖥️  PROXY SERVER CONFIG (BungeeCord/Velocity)');
+  console.log('='.repeat(60));
+  console.log('   This tracks player joins/leaves at the network level.');
+  console.log(`   API Key:    ${DEV_API_KEYS.proxy}`);
   console.log(`   Network ID: ${DEV_NETWORK_ID}`);
-  console.log('\n✅ Seeding complete!');
+
+  console.log('\n' + '='.repeat(60));
+  console.log('🎮 PAPER SERVER CONFIGS (Gamemodes)');
+  console.log('='.repeat(60));
+  console.log('   Each Paper server uses a gamemode-specific key to track');
+  console.log('   activity on that specific gamemode.\n');
+
+  console.log('   [Survival Server]');
+  console.log(`   API Key:     ${DEV_API_KEYS.survival}`);
+  console.log(`   Network ID:  ${DEV_NETWORK_ID}`);
+  console.log(`   Gamemode ID: ${DEV_GAMEMODE_IDS.survival}\n`);
+
+  console.log('   [SkyBlock Server]');
+  console.log(`   API Key:     ${DEV_API_KEYS.skyblock}`);
+  console.log(`   Network ID:  ${DEV_NETWORK_ID}`);
+  console.log(`   Gamemode ID: ${DEV_GAMEMODE_IDS.skyblock}\n`);
+
+  console.log('   [Prison Server]');
+  console.log(`   API Key:     ${DEV_API_KEYS.prison}`);
+  console.log(`   Network ID:  ${DEV_NETWORK_ID}`);
+  console.log(`   Gamemode ID: ${DEV_GAMEMODE_IDS.prison}`);
+
+  console.log('\n' + '='.repeat(60));
+  console.log('✅ Seeding complete!');
+  console.log('='.repeat(60));
 }
 
 seed()
