@@ -1,9 +1,9 @@
 import { redirect } from 'next/navigation';
 import { auth } from '@/lib/auth';
-import { Sidebar } from '@/components/layout/sidebar';
-import { Header } from '@/components/layout/header';
+import { AdminSidebar } from '@/components/layout/admin-sidebar';
+import { AdminHeader } from '@/components/layout/admin-header';
 
-export default async function DashboardLayout({
+export default async function AdminLayout({
   children,
 }: {
   children: React.ReactNode;
@@ -14,16 +14,17 @@ export default async function DashboardLayout({
     redirect('/login');
   }
 
-  const userWithRole = {
-    ...session.user,
-    role: (session as any).user?.role || 'member',
-  };
+  // Check if user is admin
+  const userRole = (session as any).user?.role;
+  if (userRole !== 'admin') {
+    redirect('/networks');
+  }
 
   return (
     <div className="flex h-screen bg-gray-950">
-      <Sidebar />
+      <AdminSidebar />
       <div className="flex-1 flex flex-col overflow-hidden">
-        <Header user={userWithRole} />
+        <AdminHeader user={session.user} />
         <main className="flex-1 overflow-auto p-6">{children}</main>
       </div>
     </div>

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { signOut } from 'next-auth/react';
-import { usePathname, useParams } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { Avatar } from '@/components/ui/avatar';
@@ -10,59 +10,56 @@ import {
   ChevronDown,
   LogOut,
   Settings,
-  HelpCircle,
   Shield,
 } from 'lucide-react';
 
-interface HeaderProps {
+interface AdminHeaderProps {
   user: {
     name?: string | null;
     email?: string | null;
     image?: string | null;
-    role?: string;
   };
 }
 
-// Map paths to readable titles
 const pathTitles: Record<string, string> = {
-  analytics: 'Analytics',
-  players: 'Players',
-  campaigns: 'Campaigns',
-  team: 'Team',
-  settings: 'Settings',
-  'api-keys': 'API Keys',
-  webhooks: 'Webhooks',
-  alerts: 'Alerts',
-  payments: 'Payment Providers',
-  'audit-log': 'Audit Log',
-  export: 'Data Export',
+  admin: 'Dashboard',
+  users: 'Users',
+  networks: 'Networks',
+  health: 'System Health',
+  'feature-flags': 'Feature Flags',
+  'audit-logs': 'Audit Logs',
 };
 
-function Breadcrumbs() {
+function AdminBreadcrumbs() {
   const pathname = usePathname();
-  const params = useParams();
-  const networkId = params.networkId as string;
 
-  // Parse the path after the networkId
-  const pathAfterNetwork = pathname.split(`/${networkId}/`)[1] || '';
-  const segments = pathAfterNetwork.split('/').filter(Boolean);
+  const segments = pathname.split('/').filter(Boolean);
+  // Remove 'admin' from display
+  const displaySegments = segments.slice(1);
 
-  if (segments.length === 0) {
-    return <span className="text-gray-50 font-medium">Dashboard</span>;
+  if (displaySegments.length === 0) {
+    return (
+      <div className="flex items-center gap-2">
+        <Shield className="h-4 w-4 text-red-500" />
+        <span className="text-gray-50 font-medium">Admin Dashboard</span>
+      </div>
+    );
   }
 
   return (
     <div className="flex items-center gap-2 text-sm">
-      {segments.map((segment, index) => {
-        const isLast = index === segments.length - 1;
+      <Shield className="h-4 w-4 text-red-500" />
+      <Link href="/admin" className="text-gray-400 hover:text-gray-100 transition-colors">
+        Admin
+      </Link>
+      {displaySegments.map((segment, index) => {
+        const isLast = index === displaySegments.length - 1;
         const title = pathTitles[segment] || segment;
-        const href = `/${networkId}/${segments.slice(0, index + 1).join('/')}`;
+        const href = `/admin/${displaySegments.slice(0, index + 1).join('/')}`;
 
         return (
           <span key={segment} className="flex items-center gap-2">
-            {index > 0 && (
-              <span className="text-gray-600">/</span>
-            )}
+            <span className="text-gray-600">/</span>
             {isLast ? (
               <span className="text-gray-50 font-medium">{title}</span>
             ) : (
@@ -80,18 +77,23 @@ function Breadcrumbs() {
   );
 }
 
-export function Header({ user }: HeaderProps) {
+export function AdminHeader({ user }: AdminHeaderProps) {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
 
   return (
     <header className="h-16 border-b border-gray-800 bg-gray-900 flex items-center justify-between px-6">
       {/* Left: Breadcrumbs */}
       <div className="flex items-center gap-4">
-        <Breadcrumbs />
+        <AdminBreadcrumbs />
       </div>
 
       {/* Right: Actions */}
       <div className="flex items-center gap-2">
+        {/* Admin Badge */}
+        <div className="px-2 py-1 rounded-md bg-red-600/10 border border-red-600/20 text-red-400 text-xs font-medium mr-2">
+          Admin Mode
+        </div>
+
         {/* User Menu */}
         <div className="relative">
           <button
@@ -146,16 +148,6 @@ export function Header({ user }: HeaderProps) {
 
                 {/* Menu Items */}
                 <div className="py-1">
-                  {user.role === 'admin' && (
-                    <Link
-                      href="/admin"
-                      onClick={() => setUserMenuOpen(false)}
-                      className="flex items-center gap-3 px-4 py-2 text-sm text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-colors"
-                    >
-                      <Shield className="h-4 w-4" />
-                      Admin Panel
-                    </Link>
-                  )}
                   <Link
                     href="/profile"
                     onClick={() => setUserMenuOpen(false)}
@@ -164,15 +156,6 @@ export function Header({ user }: HeaderProps) {
                     <Settings className="h-4 w-4" />
                     Account Settings
                   </Link>
-                  <a
-                    href="https://docs.mctrack.io"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-3 px-4 py-2 text-sm text-gray-300 hover:bg-gray-800 hover:text-gray-100 transition-colors"
-                  >
-                    <HelpCircle className="h-4 w-4" />
-                    Documentation
-                  </a>
                 </div>
 
                 {/* Sign Out */}
