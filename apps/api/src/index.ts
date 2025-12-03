@@ -17,6 +17,7 @@ import { gamemodesRouter } from './routes/gamemodes.js';
 import { auditRouter } from './routes/audit.js';
 import { webhooksRouter } from './routes/webhooks.js';
 import { alertsRouter } from './routes/alerts.js';
+import { adminRouter } from './routes/admin.js';
 import { logger } from './lib/logger.js';
 
 const app: Express = express();
@@ -65,6 +66,7 @@ app.use('/networks/:networkId/gamemodes', gamemodesRouter);
 app.use('/networks/:networkId/webhooks', webhooksRouter);
 app.use('/networks/:networkId/alerts', alertsRouter);
 app.use('/networks/:networkId/audit-logs', auditRouter);
+app.use('/admin', adminRouter);
 
 // Error handling
 app.use(errorHandler);
