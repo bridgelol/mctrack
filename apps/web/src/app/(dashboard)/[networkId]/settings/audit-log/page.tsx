@@ -4,6 +4,11 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useParams } from 'next/navigation';
 import { api } from '@/lib/api';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { EmptyState } from '@/components/ui/empty-state';
+import { ScrollText, ChevronLeft, ChevronRight, ChevronDown, User, Globe } from 'lucide-react';
 
 interface AuditLog {
   id: string;
@@ -65,6 +70,7 @@ export default function AuditLogPage() {
 
   const [page, setPage] = useState(1);
   const [actionFilter, setActionFilter] = useState<string>('');
+  const [expandedLogs, setExpandedLogs] = useState<Set<string>>(new Set());
   const pageSize = 50;
 
   const { data: actionsData } = useQuery<ActionsResponse>({
@@ -89,43 +95,71 @@ export default function AuditLogPage() {
   const totalPages = data ? Math.ceil(data.total / pageSize) : 0;
 
   const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleString();
+    return new Date(dateStr).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    });
   };
 
   const getActionLabel = (action: string) => {
-    return ACTION_LABELS[action] || action.replace(/[._]/g, ' ');
+    return ACTION_LABELS[action] || action.replace(/[._]/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
   };
 
-  const getActionBadgeClass = (action: string) => {
-    if (action.includes('created') || action.includes('joined')) return 'badge-success';
-    if (action.includes('deleted') || action.includes('removed') || action.includes('revoked')) return 'badge-error';
-    if (action.includes('updated') || action.includes('changed')) return 'badge-warning';
-    return 'badge-info';
+  const getActionVariant = (action: string): 'success' | 'error' | 'warning' | 'brand' => {
+    if (action.includes('created') || action.includes('joined')) return 'success';
+    if (action.includes('deleted') || action.includes('removed') || action.includes('revoked')) return 'error';
+    if (action.includes('updated') || action.includes('changed')) return 'warning';
+    return 'brand';
+  };
+
+  const toggleExpanded = (logId: string) => {
+    setExpandedLogs(prev => {
+      const next = new Set(prev);
+      if (next.has(logId)) {
+        next.delete(logId);
+      } else {
+        next.add(logId);
+      }
+      return next;
+    });
   };
 
   if (isLoading) {
     return (
-      <div className="flex justify-center py-12">
-        <span className="loading loading-spinner loading-lg" />
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <div className="space-y-2">
+            <div className="h-8 w-28 bg-gray-800 rounded-lg animate-pulse" />
+            <div className="h-4 w-48 bg-gray-800 rounded animate-pulse" />
+          </div>
+        </div>
+        <div className="space-y-2">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <div key={i} className="h-16 bg-gray-900 rounded-xl border border-gray-800 animate-pulse" />
+          ))}
+        </div>
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      {/* Header */}
+      <div className="flex justify-between items-start">
         <div>
-          <h1 className="text-2xl font-bold">Audit Log</h1>
-          <p className="text-base-content/60">
+          <h1 className="text-2xl font-bold text-gray-50">Audit Log</h1>
+          <p className="text-sm text-gray-400 mt-1">
             Track all actions in your network
           </p>
         </div>
       </div>
 
       {/* Filters */}
-      <div className="flex gap-4 flex-wrap">
+      <div className="flex items-center gap-4">
         <select
-          className="select select-bordered select-sm"
+          className="h-9 px-3 rounded-lg border border-gray-700 bg-gray-900 text-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
           value={actionFilter}
           onChange={(e) => {
             setActionFilter(e.target.value);
@@ -140,89 +174,104 @@ export default function AuditLogPage() {
           ))}
         </select>
 
-        <div className="text-sm text-base-content/60 self-center">
+        <span className="text-sm text-gray-500">
           {data?.total.toLocaleString()} total events
-        </div>
+        </span>
       </div>
 
       {/* Logs */}
       {data?.logs.length === 0 ? (
-        <div className="text-center py-12">
-          <p className="text-base-content/60">No audit logs found</p>
-        </div>
+        <EmptyState
+          icon={ScrollText}
+          title="No audit logs found"
+          description={actionFilter ? 'Try adjusting your filter' : 'Actions will appear here as they occur'}
+        />
       ) : (
         <div className="space-y-2">
           {data?.logs.map((log) => (
-            <div key={log.id} className="card bg-base-200">
-              <div className="card-body py-3 px-4">
+            <Card key={log.id} padding="none">
+              <CardContent className="px-4 py-3">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <span className={`badge badge-sm ${getActionBadgeClass(log.action)}`}>
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <Badge variant={getActionVariant(log.action)} size="sm">
                       {getActionLabel(log.action)}
-                    </span>
-                    <span className="text-sm">
+                    </Badge>
+                    <div className="flex items-center gap-2 text-sm">
                       {log.user ? (
-                        <span className="font-medium">{log.user.username}</span>
+                        <span className="flex items-center gap-1.5 text-gray-200">
+                          <User className="h-3.5 w-3.5 text-gray-500" />
+                          {log.user.username}
+                        </span>
                       ) : (
-                        <span className="text-base-content/60">System</span>
+                        <span className="text-gray-500">System</span>
                       )}
-                    </span>
-                    {log.targetType && (
-                      <span className="text-sm text-base-content/60">
-                        on {log.targetType}
-                        {log.targetId && (
-                          <span className="font-mono text-xs ml-1">
-                            ({log.targetId.slice(0, 8)}...)
-                          </span>
-                        )}
+                      {log.targetType && (
+                        <span className="text-gray-500">
+                          on <span className="text-gray-400">{log.targetType}</span>
+                          {log.targetId && (
+                            <code className="ml-1 text-xs text-gray-500">
+                              ({log.targetId.slice(0, 8)}...)
+                            </code>
+                          )}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-4 text-sm text-gray-500">
+                    {log.ipAddress && (
+                      <span className="hidden md:flex items-center gap-1.5 font-mono text-xs">
+                        <Globe className="h-3.5 w-3.5" />
+                        {log.ipAddress}
                       </span>
                     )}
-                  </div>
-                  <div className="flex items-center gap-4 text-sm text-base-content/60">
-                    {log.ipAddress && (
-                      <span className="font-mono text-xs">{log.ipAddress}</span>
-                    )}
                     <span>{formatDate(log.createdAt)}</span>
+                    {log.metadata && Object.keys(log.metadata).length > 0 && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 px-2"
+                        onClick={() => toggleExpanded(log.id)}
+                      >
+                        <ChevronDown className={`h-4 w-4 transition-transform ${expandedLogs.has(log.id) ? 'rotate-180' : ''}`} />
+                      </Button>
+                    )}
                   </div>
                 </div>
-                {log.metadata && Object.keys(log.metadata).length > 0 && (
-                  <details className="mt-2">
-                    <summary className="cursor-pointer text-xs text-base-content/60">
-                      View details
-                    </summary>
-                    <pre className="mt-2 text-xs bg-base-300 p-2 rounded overflow-x-auto">
+                {expandedLogs.has(log.id) && log.metadata && Object.keys(log.metadata).length > 0 && (
+                  <div className="mt-3 pt-3 border-t border-gray-800">
+                    <pre className="text-xs text-gray-400 bg-gray-800/50 p-3 rounded-lg overflow-x-auto">
                       {JSON.stringify(log.metadata, null, 2)}
                     </pre>
-                  </details>
+                  </div>
                 )}
-              </div>
-            </div>
+              </CardContent>
+            </Card>
           ))}
         </div>
       )}
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex justify-center">
-          <div className="join">
-            <button
-              className="join-item btn btn-sm"
-              disabled={page === 1}
-              onClick={() => setPage(page - 1)}
-            >
-              «
-            </button>
-            <button className="join-item btn btn-sm">
-              Page {page} of {totalPages}
-            </button>
-            <button
-              className="join-item btn btn-sm"
-              disabled={page === totalPages}
-              onClick={() => setPage(page + 1)}
-            >
-              »
-            </button>
-          </div>
+        <div className="flex items-center justify-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={page === 1}
+            onClick={() => setPage(page - 1)}
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <span className="text-sm text-gray-400 px-4">
+            Page {page} of {totalPages}
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={page === totalPages}
+            onClick={() => setPage(page + 1)}
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
         </div>
       )}
     </div>
