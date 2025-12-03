@@ -96,12 +96,15 @@ router.post(
   async (req, res, next) => {
     try {
       const { networkId } = req.params;
+      const { startTime, endTime, ...rest } = req.body;
 
       const [campaign] = await db
         .insert(campaigns)
         .values({
-          ...req.body,
+          ...rest,
           networkId,
+          startTime: new Date(startTime),
+          endTime: new Date(endTime),
         })
         .returning();
 
@@ -174,10 +177,16 @@ router.patch(
   async (req, res, next) => {
     try {
       const { networkId, campaignId } = req.params;
+      const { endTime, ...rest } = req.body;
+
+      const updateData: Record<string, unknown> = { ...rest };
+      if (endTime) {
+        updateData.endTime = new Date(endTime);
+      }
 
       const [campaign] = await db
         .update(campaigns)
-        .set(req.body)
+        .set(updateData)
         .where(and(
           eq(campaigns.id, campaignId),
           eq(campaigns.networkId, networkId)
